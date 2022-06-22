@@ -1,29 +1,34 @@
 library(tidyverse) ; library(glue) ; library(magrittr)
 library(vroom) ; library(arrow) ; library(coloc)
-library(TwoSampleMR) ; library(MRutils)
+library(SomaDataIO) ; library(TwoSampleMR) ; library(MRutils)
+library(data.table)
 source('dynamic_eQTL_coloc_functions.R')
+source('dynamic_eQTL_coloc_minorfunctions.R')
 
 setwd("/scratch/richards/julian.willett/eQTLpQTLDisconnect")
+`%notin%` <- Negate(`%in%`)
 
 #coloc work for soskic data
-# soskic.major.cells.coloc.rel7 = soskicColoc(vector.specific=NULL,rel6=F,allCells=F,returnCommonQTLs=F)
+# soskic.major.cells.coloc.rel7 = soskicColoc(vector.specific=NULL,allCells=F,returnCommonQTLs=F)
 soskic.major.cells.coloc.rel7 = readRDS('soskic_rel7_majorcells_allcoloc.rds')
-soskic.all.cells.coloc.rel7 = soskicColoc(vector.specific=NULL,rel6=F,allCells=T,returnCommonQTLs=F)
-saveRDS(soskic.all.cells.coloc.rel7,'soskic_rel7_allcells_allcoloc.rds')
+# soskic.all.cells.coloc.rel7 = soskicColoc(vector.specific=NULL,allCells=T,returnCommonQTLs=F)
+# saveRDS(soskic.all.cells.coloc.rel7,'soskic_rel7_allcells_allcoloc.rds')
 
-#coloc work for bqc19 at same significant loci as soskic
-bqc.coloc.rel7.eQTL = bqcColoc(type.of.qtl='eQTL',vector.specific=NULL,rel6=F,returnCommonQTLs=F,mr=F)
-saveRDS(bqc.coloc.rel7.eQTL,'bqc_rel7_eQTL_colocall.rds')
-bqc.coloc.rel7.sQTL = bqcColoc(type.of.qtl='sQTL',vector.specific=NULL,rel6=F,mr=F)
-saveRDS(bqc.coloc.rel7.sQTL,'bqc_rel7_sQTL_colocall.rds')
-tmp = bqcColoc('eQTL',vector.specific = c('A2',6,31182658,'noninf','ENSG00000204472'),rel6=F)
-tmp = bqcColoc('sQTL',vector.specific = c('A2',11,34482745,'noninf','ENSG00000121691'),rel6=F)
+#coloc work for bqc19
+# bqc.coloc.rel7.eQTL = bqcColoc(type.of.qtl='eQTL',vector.specific=NULL,rel6=F,returnCommonQTLs=F,mr=F)
+# saveRDS(bqc.coloc.rel7.eQTL,'bqc_rel7_eQTL_colocall.rds')
+# bqc.coloc.rel7.sQTL = bqcColoc(type.of.qtl='sQTL',vector.specific=NULL,rel6=F,mr=F)
+# saveRDS(bqc.coloc.rel7.sQTL,'bqc_rel7_sQTL_colocall.rds')
+bqc.coloc.rel7.eQTL = readRDS('bqc_rel7_eQTL_colocall.rds')
+bqc.coloc.rel7.sQTL = readRDS('bqc_rel7_sQTL_colocall.rds')
 
 #coloc work for gtex at same sig loci
-gtex.coloc.eQTL = gtexColoc('eQTL',NULL,returnCommonQTLs=F,mr=F,onlySoskicLoci=T)
-sens.napsa.a2 = gtexColoc('eQTL',c('A2',19,50363849,NA,'ENSG00000131400'),returnCommonQTLs=F,mr=F,onlySoskicLoci=T)
-sens.napsa.b2 = gtexColoc('eQTL',c('B2',19,50362278,NA,'ENSG00000131400'),returnCommonQTLs=F,mr=F,onlySoskicLoci=T)
-sens.napsa.c2 = gtexColoc('eQTL',c('C2',19,50362278,NA,'ENSG00000131400'),returnCommonQTLs=F,mr=F,onlySoskicLoci=T)
+# gtex.coloc.eQTL = gtexColoc('eQTL',NULL,returnCommonQTLs=F,mr=F,onlySoskicLoci=F)
+# saveRDS(gtex.coloc.eQTL,'gtex_rel8_eQTL_colocall.rds')
+# gtex.coloc.sQTL = gtexColoc('sQTL',NULL,returnCommonQTLs=F,mr=F,onlySoskicLoci=F)
+# saveRDS(gtex.coloc.sQTL,'gtex_rel8_sQTL_colocall.rds')
+gtex.coloc.eQTL = readRDS('gtex_rel8_eQTL_colocall.rds')
+gtex.coloc.sQTL = readRDS('gtex_rel8_sQTL_colocall.rds')
 
 #H4.PP figures
 #OUTCOME A2 SOSKIC
@@ -47,162 +52,85 @@ cd4.memory.c2 = plotDynamicPP(soskic.major.cells.coloc.rel7,'CD4_Memory','C2',c(
 tcm.c2 = plotDynamicPP(soskic.major.cells.coloc.rel7,'TCM_','C2',c(1,11),c())
 TEM.c2 = plotDynamicPP(soskic.major.cells.coloc.rel7,'TEM_','C2',c(9,19),c())
 
-#bqc figs
-bqc.a2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.eQTL,'A2',c(9,11,16,19),c('ABO'))
-bqc.b2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.eQTL,'B2',c(8,9,11,19),c('ABO','NTN5'))
-bqc.c2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.eQTL,'C2',c(1,9,11,19),c('NTN5','GBAP1','NAPSB','TYK2','THBS3'))
+#BQC H4.PP FIGS eQTL
+bqc.a2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.eQTL,'A2','eQTL',c(7,9,10,17,19,21),c('NSF','KANSL1','NUTM2B','RP11-259G18.3'))
+bqc.b2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.eQTL,'B2','eQTL',c(8,9,17,19,21),c('RP11-259G18.3','NSF','NTN5'))
+bqc.c2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.eQTL,'C2','eQTL',c(1,19,21),c('NTN5'))
+rm(bqc.a2.coloc,bqc.b2.coloc,bqc.c2.coloc)
 
-#sensitivity analyses
-#OUTCOME A2 by cell
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'CD4_Naive','_40h_','ENSG00000204472'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'CD4_Naive','_5d_','ENSG00000204472'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',11,34482745,'CD4_Naive','_0h_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',19,50363849,'CD4_Naive','_40h_','ENSG00000131400'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'CD4_Memory','_40h_','ENSG00000204472'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'CD4_Memory','_5d_','ENSG00000204472'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',11,34482745,'CD4_Memory','_5d_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',16,89196249,'CD4_Memory','_5d_','ENSG00000176715'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',6,29946723,'TEM_40h','_40h_','ENSG00000206503'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'TEM_40h','_40h_','ENSG00000204472'),rel6=F,allCells=T,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'TEM_5d','_5d_','ENSG00000204472'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',9,133271182,'TEM_16h','_16h_','ENSG00000160271'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',19,50363849,'TEM_40h','_40h_','ENSG00000131400'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'TCM_','_40h_','ENSG00000204472'),rel6=F,allCells=T,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'TCM_','_5d_','ENSG00000204472'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',11,34482745,'TCM_','_5d_','ENSG00000121691'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'TN_40h','_40h_','ENSG00000204472'),rel6=F,allCells=T,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('A2',6,31182658,'TN_5d','_5d_','ENSG00000204472'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',11,34482745,'TN_0h','_0h_','ENSG00000121691'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('A2',19,50363849,'TN_40h','_40h_','ENSG00000131400'),rel6=F,allCells=T,returnCommonQTLs = F)
+#BQC H4.PP FIGS sQTL
+bqc.a2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.sQTL,'A2','sQTL',c(12,21),c('chr12:112911235:112916509:clu_9748_+:ENSG00000089127.15','chr12:112911258:112916509:clu_9748_+:ENSG00000089127.15','chr21:33230216:33241840:clu_28170_+:IFNAR2','chr21:33230216:33241886:clu_28170_+:IFNAR2'))
+bqc.b2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.sQTL,'B2','sQTL',c(8,12,21),c('chr12:112911235:112916509:clu_9748_+:ENSG00000089127.15'))
+bqc.c2.coloc = plotDynamicPP.BQC(bqc.coloc.rel7.sQTL,'C2','sQTL',c(12,21),c('chr12:112911235:112916509:clu_9748_+:ENSG00000089127.15','chr21:33230216:33241840:clu_28170_+:IFNAR2','OAS1 Splice Variant G'))
+rm(bqc.a2.coloc,bqc.b2.coloc,bqc.c2.coloc)
 
-#OUTCOME B2
-tmp = soskicColoc(vector.specific=c('B2',8,60515641,'CD4_Naive','_16h_','ENSG00000104388'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',8,60515641,'CD4_Naive','_40h_','ENSG00000104388'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',11,34482745,'CD4_Naive','_0h_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',19,48703160,'CD4_Naive','_0h_','ENSG00000087076'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('B2',19,48703160,'CD4_Naive','_5d_','ENSG00000087076'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('B2',19,50362278,'CD4_Naive','_40h_','ENSG00000131400'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',8,60515641,'CD4_Memory','_16h_','ENSG00000104388'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',8,60515641,'CD4_Memory','_40h_','ENSG00000104388'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',11,34482745,'CD4_Memory','_5d_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',19,48703160,'CD4_Memory','_0h_','ENSG00000087076'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('B2',8,60515641,'TCM_','_16h_','ENSG00000104388'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',11,34482745,'TCM_','_5d_','ENSG00000121691'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',8,60515641,'TN_16h','_16h_','ENSG00000104388'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',8,60515641,'TN_40h','_40h_','ENSG00000104388'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',11,34482745,'TN_0h','_0h_','ENSG00000121691'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',19,48703160,'TN_0h','_0h_','ENSG00000087076'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',19,48703160,'TN_5d','_5d_','ENSG00000087076'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',19,50362278,'TN_40h','_40h_','ENSG00000131400'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',9,133263862,'TEM_16h','_16h_','ENSG00000160271'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('B2',19,50362278,'TEM_40h','_40h_','ENSG00000131400'),rel6=F,allCells=T,returnCommonQTLs = F)
+#GTEX H4.PP FIGS eQTL
+gtex.a2.coloc = plotDynamicPP.GTEx(gtex.coloc.eQTL,'A2','eQTL',c(5,7,9,17,19),exclude.genes=c('LINC02863','KANSL1-AS1'))
+gtex.b2.coloc = plotDynamicPP.GTEx(gtex.coloc.eQTL,'B2','eQTL',c(5,9,17,19),c('LINC02863','KANSL1-AS1'))
+gtex.c2.coloc = plotDynamicPP.GTEx(gtex.coloc.eQTL,'C2','eQTL',c(1,12,19),c('NTN5'))
+rm(gtex.a2.coloc,gtex.b2.coloc,gtex.c2.coloc)
 
-#OUTCOME C2
-tmp = soskicColoc(vector.specific=c('C2',11,34432600,'CD4_Naive','_0h_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('C2',19,50362278,'CD4_Naive','_40h_','ENSG00000131400'),rel6=F,allCells=F,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('C2',11,34432600,'CD4_Memory','_5d_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('C2',1,155162859,'TCM_','_5d_','ENSG00000143537'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('C2',11,34432600,'TCM_','_5d_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('C2',1,155162859,'TN_5d','_5d_','ENSG00000177628'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('C2',11,34432600,'TN_0h','_0h_','ENSG00000121691'),rel6=F,allCells=F,returnCommonQTLs = F,mr=F)
-tmp = soskicColoc(vector.specific=c('C2',19,50362278,'TN_40h','_40h_','ENSG00000131400'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('C2',9,133271745,'TEM_16h','_16h_','ENSG00000160271'),rel6=F,allCells=T,returnCommonQTLs = F)
-tmp = soskicColoc(vector.specific=c('C2',19,50362278,'TEM_40h','_40h_','ENSG00000131400'),rel6=F,allCells=T,returnCommonQTLs = F)
+#GTEX H4.PP FIGS sQTL
+gtex.a2.coloc = plotDynamicPP.GTEx(gtex.coloc.sQTL,'A2','sQTL',c(12,19,21),c('chr19:10351162:10352434:clu_19126:TYK2','chr21:33230216:33241840:clu_24781:ENSG00000159110.19','chr21:33252830:33260597:clu_24783:ENSG00000159110.19','IFNAR2 Splice Variant E'))
+gtex.b2.coloc = plotDynamicPP.GTEx(gtex.coloc.sQTL,'B2','sQTL',c(12,19,21),c('chr19:10351162:10352434:clu_19126:TYK2','chr21:33230216:33241840:clu_24781:ENSG00000159110.19','chr21:33252830:33260597:clu_24783:ENSG00000159110.19','IFNAR2 Splice Variant E'))
+gtex.c2.coloc = plotDynamicPP.GTEx(gtex.coloc.sQTL,'C2','sQTL',c(1,12,19,21),c('chr19:10353098:10354042:clu_19127:TYK2','chr21:33230216:33241840:clu_24781:ENSG00000159110.19','chr21:33252830:33260597:clu_24783:ENSG00000159110.19','IFNAR2 Splice Variant E'))
 
-#BQC A2
-tmp = bqcColoc('eQTL',vector.specific = c('A2',19,50363849,'noninf','ENSG00000131400'),rel6=F,returnCommonQTLs=F,mr=F)
-#BQC B2
-tmp = bqcColoc('eQTL',vector.specific = c('B2',8,60515641,'noninf','ENSG00000104388'),rel6=F,returnCommonQTLs=F,mr=F)
-tmp = bqcColoc('eQTL',vector.specific = c('B2',8,60515641,'inf','ENSG00000104388'),rel6=F,returnCommonQTLs=F,mr=F)
-tmp = bqcColoc('eQTL',vector.specific = c('B2',19,50362278,'noninf','ENSG00000131400'),rel6=F,returnCommonQTLs=F,mr=F)
-#BQC C2
-tmp = bqcColoc('eQTL',vector.specific = c('C2',19,50362278,'noninf','ENSG00000131400'),rel6=F,returnCommonQTLs=F,mr=F)
+###sens testing
+soskic.eqtl.sens = doAllSensTests('soskic','eQTL',soskic.major.cells.coloc.rel7) ; saveRDS(soskic.eqtl.sens,'soskic_eqtl_sens.rds')
+# bqc.eqtl.sens = doAllSensTests('bqc','eQTL',bqc.coloc.rel7.eQTL) ; saveRDS(bqc.eqtl.sens,'bqc_eqtl_sens.rds')
+# bqc.sqtl.sens = doAllSensTests('bqc','sQTL',bqc.coloc.rel7.sQTL) ; saveRDS(bqc.sqtl.sens,'bqc_sqtl_sens.rds')
+gtex.eqtl.sens = doAllSensTests('gtex','eQTL',gtex.coloc.eQTL) ; saveRDS(gtex.eqtl.sens,'gtex_eqtl_sens.rds')
+# gtex.sqtl.sens = doAllSensTests('gtex','sQTL',gtex.coloc.sQTL) ; saveRDS(gtex.sqtl.sens,'gtex_sqtl_sens.rds')
+# item=48
+# sensitivity(gtex.sqtl.sens[[1]][[item]],rule='H4 > 0.5')
+# print(gtex.sqtl.sens[[2]][[item]])
 
-#conduct MR
-#OUTCOME A2
-mr.boskic.cat.a2.naive.0h = conductMRBoskic('A2','11:34482745','CD4_Naive','_0h_','ENSG00000121691') #ivw sig
-mr.boskic.napsa.a2.naive.40h = conductMRBoskic('A2','19:50363849','CD4_Naive','_40h_','ENSG00000131400') #not ivw sig
-mr.boskic.cat.a2.memory.5d = conductMRBoskic('A2','11:34482745','CD4_Memory','_5d_','ENSG00000121691') #ivw sig
-mr.boskic.acsf3.a2.memory.5d = conductMRBoskic('A2','16:89196249','CD4_Memory','_5d_','ENSG00000176715') #ivw sig
-mr.boskic.ralgds.a2.TEM.16h = conductMRBoskic('A2','9:133271182','TEM_16h','_16h_','ENSG00000160271')
-mr.boskic.napsa.a2.TEM.40h = conductMRBoskic('A2','19:50363849','TEM_40h','_40h_','ENSG00000131400')
-mr.boskic.cat.a2.TCM.5d = conductMRBoskic('A2','11:34482745','TCM_','_5d_','ENSG00000121691')
-mr.boskic.cat.a2.TN.0h = conductMRBoskic('A2','11:34482745','TN_0h','_0h_','ENSG00000121691')
-mr.boskic.napsa.a2.TN.40h = conductMRBoskic('A2','19:50363849','TN_40h','_40h_','ENSG00000131400')
+#Get all data for MR input
+mr.data.soskic.eqtl = getAllMRDataReady('soskic','eQTL',soskic.major.cells.coloc.rel7 %>% dplyr::filter(CHR != 6)) ; saveRDS(mr.data.soskic.eqtl,'mr_data_soskic_eqtl.rds')
+# mr.data.bqc.eqtl = getAllMRDataReady('bqc','eQTL',bqc.coloc.rel7.eQTL %>% dplyr::filter(CHR != 6)) ; saveRDS(mr.data.bqc.eqtl,'mr_data_bqc_eqtl.rds')
+# mr.data.bqc.sqtl = getAllMRDataReady('bqc','sQTL',bqc.coloc.rel7.sQTL %>% dplyr::filter(CHR != 6)) ; saveRDS(mr.data.bqc.sqtl,'mr_data_bqc_sqtl.rds')
+# mr.data.gtex.eqtl = getAllMRDataReady('gtex','eQTL',gtex.coloc.eQTL %>% dplyr::filter(CHR != 6)) ; saveRDS(mr.data.gtex.eqtl,'mr_data_gtex_eqtl.rds')
+# mr.data.gtex.sqtl = getAllMRDataReady('gtex','sQTL',gtex.coloc.sQTL %>% dplyr::filter(CHR != 6)) ; saveRDS(mr.data.gtex.sqtl,'mr_data_gtex_sqtl.rds')
 
-#OUTCOME B2
-mr.boskic.rab2a.b2.naive.16h = conductMRBoskic('B2','8:60515641','CD4_Naive','_16h_','ENSG00000104388') #ivw sig
-mr.boskic.rab2a.b2.naive.40h = conductMRBoskic('B2','8:60515641','CD4_Naive','_40h_','ENSG00000104388') #ivw sig
-mr.boskic.cat.b2.naive.0h = conductMRBoskic('B2','11:34482745','CD4_Naive','_0h_','ENSG00000121691') #ivw sig
-mr.boskic.napsa.b2.naive.40h = conductMRBoskic('B2','19:50362278','CD4_Naive','_40h_','ENSG00000131400') #ivw sig
-mr.boskic.rab2a.b2.memory.16h = conductMRBoskic('B2','8:60515641','CD4_Memory','_16h_','ENSG00000104388') #ivw sig
-mr.boskic.rab2a.b2.memory.40h = conductMRBoskic('B2','8:60515641','CD4_Memory','_40h_','ENSG00000104388') #ivw sig
-mr.boskic.cat.b2.memory.5d = conductMRBoskic('B2','11:34482745','CD4_Memory','_5d_','ENSG00000121691') #ivw sig
-mr.boskic.rab2a.b2.tcm.16h = conductMRBoskic('B2','8:60515641','TCM_','_16h_','ENSG00000104388') 
-mr.boskic.cat.b2.tcm.5d = conductMRBoskic('B2','11:34482745','TCM_','_5d_','ENSG00000121691') 
-mr.boskic.rab2a.b2.tn.16h = conductMRBoskic('B2','8:60515641','TN_16h','_16h_','ENSG00000104388') 
-mr.boskic.rab2a.b2.tn.40h = conductMRBoskic('B2','8:60515641','TN_40h','_40h_','ENSG00000104388') 
-mr.boskic.cat.b2.tn.0h = conductMRBoskic('B2','11:34482745','TN_0h','_0h_','ENSG00000121691') 
-mr.boskic.napsa.b2.tn.40h = conductMRBoskic('B2','19:50362278','TN_40h','_40h_','ENSG00000131400') 
-mr.boskic.ralgds.b2.tem.16h = conductMRBoskic('B2','9:133263862','TEM_16h','_16h_','ENSG00000160271') 
-mr.boskic.napsa.b2.tem.40h = conductMRBoskic('B2','19:50362278','TEM_40h','_40h_','ENSG00000131400') 
-
-#OUTCOME C2
-mr.boskic.cat.c2.naive.0h = conductMRBoskic('C2','11:34432600','CD4_Naive','_0h_','ENSG00000121691') #ivw sig
-mr.boskic.napsa.c2.naive.40h = conductMRBoskic('C2','19:50362278','CD4_Naive','_40h_','ENSG00000131400') #ivw sig
-mr.boskic.cat.c2.memory.5d = conductMRBoskic('C2','11:34432600','CD4_Memory','_5d_','ENSG00000121691') #ivw sig
-mr.boskic.adam15.c2.tcm.5d = conductMRBoskic('C2','1:155162859','TCM_','_5d_','ENSG00000143537') #ivw sig
-mr.boskic.cat.c2.tcm.5d = conductMRBoskic('C2','11:34432600','TCM_','_5d_','ENSG00000121691') #ivw sig
-mr.boskic.cat.c2.tn.0h = conductMRBoskic('C2','11:34432600','TN_0h','_0h_','ENSG00000121691') #ivw sig
-mr.boskic.napsa.c2.tn.40h = conductMRBoskic('C2','19:50362278','TN_40h','_40h_','ENSG00000131400') #ivw sig
-mr.boskic.ralgds.c2.tem.16h = conductMRBoskic('C2','9:133271745','TEM_16h','_16h_','ENSG00000160271') #ivw sig
-mr.boskic.napsa.c2.tem.40h = conductMRBoskic('C2','19:50362278','TEM_40h','_40h_','ENSG00000131400') #ivw sig
-
-#BQC MR
-#a2
-mr.bqc.napsa.a2.noninf = conductMRBQC('eQTL','A2','19:50363849','noninf','ENSG00000131400') #ivw sig
-#bqc b2
-mr.bqc.rab2a.b2.noninf = conductMRBQC('eQTL','B2','8:60515641','noninf','ENSG00000104388') #not ivw sig
-mr.bqc.rab2a.b2.inf = conductMRBQC('eQTL','B2','8:60515641','inf','ENSG00000104388') #IVW sig, sens tests suggest issue
-mr.bqc.napsa.b2.noninf = conductMRBQC('eQTL','B2','19:50362278','noninf','ENSG00000131400') #IVW sig
-#bqc c2
-mr.bqc.napsa.b2.noninf = conductMRBQC('eQTL','C2','19:50362278','noninf','ENSG00000131400') #not IVW sig
-
-#GTEx MR
-mr.gtex.napsa.a2 = conductMRGTEx('eQTL','A2','19:50363849',NA,'ENSG00000131400') #concerning sens
-mr.gtex.napsa.b2 = conductMRGTEx('eQTL','B2','19:50362278',NA,'ENSG00000131400')
-mr.gtex.napsa.c2 = conductMRGTEx('eQTL','C2','19:50362278',NA,'ENSG00000131400')
+#Do MR
+mr.computed.boskic.eqtl = conductMR(mr.data.soskic.eqtl)
+# mr.computed.bqc.eqtl = conductMR(mr.data.bqc.eqtl) ; saveRDS(mr.computed.bqc.eqtl,'mr_computed_bqc_eqtl.rds')
+# mr.computed.bqc.sqtl = conductMR(mr.data.bqc.sqtl) ; saveRDS(mr.computed.bqc.sqtl,'mr_computed_bqc_sqtl.rds')
+# mr.computed.gtex.eqtl = conductMR(mr.data.gtex.eqtl) ; saveRDS(mr.computed.gtex.eqtl,'mr_computed_gtex_eqtl.rds')
+# mr.computed.gtex.sqtl = conductMR(mr.data.gtex.sqtl) ; saveRDS(mr.computed.gtex.sqtl,'mr_computed_gtex_sqtl.rds')
 
 #plot MR results
-a2.soskic = plotMRResults(list(mr.boskic.cat.a2.naive.0h,mr.boskic.napsa.a2.naive.40h,
-                               mr.boskic.cat.a2.memory.5d,mr.boskic.acsf3.a2.memory.5d,
-                               mr.boskic.ralgds.a2.TEM.16h,mr.boskic.napsa.a2.TEM.40h,
-                               mr.boskic.cat.a2.TCM.5d,mr.boskic.cat.a2.TN.0h,
-                               mr.boskic.napsa.a2.TN.40h),
-                          c(1,0,1,1,1,1,1,1,1),outcome='A2')
-b2.soskic = plotMRResults(list(mr.boskic.rab2a.b2.naive.16h,mr.boskic.rab2a.b2.naive.40h,
-                               mr.boskic.cat.b2.naive.0h,mr.boskic.napsa.b2.naive.40h,
-                               mr.boskic.rab2a.b2.memory.16h,mr.boskic.rab2a.b2.memory.40h,
-                               mr.boskic.cat.b2.memory.5d,mr.boskic.rab2a.b2.tcm.16h,
-                               mr.boskic.cat.b2.tcm.5d,mr.boskic.rab2a.b2.tn.16h,
-                               mr.boskic.rab2a.b2.tn.40h,mr.boskic.cat.b2.tn.0h,
-                               mr.boskic.napsa.b2.tn.40h,mr.boskic.ralgds.b2.tem.16h,
-                               mr.boskic.napsa.b2.tem.40h),
-                          c(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1),'B2')
-c2.soskic = plotMRResults(list(mr.boskic.cat.c2.naive.0h,mr.boskic.napsa.c2.naive.40h,
-                               mr.boskic.cat.c2.memory.5d,mr.boskic.adam15.c2.tcm.5d,
-                               mr.boskic.cat.c2.tcm.5d,mr.boskic.cat.c2.tn.0h,
-                               mr.boskic.napsa.c2.tn.40h,mr.boskic.ralgds.c2.tem.16h,
-                               mr.boskic.napsa.c2.tem.40h),
-                          c(0,1,0,1,0,0,1,1,1),'C2')
-
-#plot MR for BQC data
-bqc.mr.plot = plotMRResults.BQC(list(mr.bqc.napsa.a2.noninf,mr.bqc.rab2a.b2.noninf,
-                                 mr.bqc.rab2a.b2.inf,mr.bqc.napsa.b2.noninf,
-                                 mr.bqc.napsa.b2.noninf),c(1,0,1,0,0),
-                            c('A2','B2','B2','B2','C2'))
+mr.plot.soskic.eqtl.a2 = plotMRResults('soskic','eQTL',mr.computed.boskic.eqtl,'A2',33,c())
+mr.plot.soskic.eqtl.b2 = plotMRResults('soskic','eQTL',mr.computed.boskic.eqtl,'B2',33,c())
+mr.plot.soskic.eqtl.c2 = plotMRResults('soskic','eQTL',mr.computed.boskic.eqtl,'C2',33,c())
 
 #plot MR for GTEx data
-bqc.mr.plot = plotMRResults.GTEx(list(mr.gtex.napsa.a2,mr.gtex.napsa.b2,
-                                     mr.gtex.napsa.c2),c(0,1,1),
-                                c('A2','B2','C2'))
+#Plot MR results eQTL
+mr.plot.bqc.eqtl.a2 = plotMRResults('bqc','eQTL',mr.computed.bqc.eqtl,'A2',22,c('ENSG00000188199.10','ENSG00000120071.15','ENSG00000262539.1','ENSG00000073969.18'))
+mr.plot.bqc.eqtl.b2 = plotMRResults('bqc','eQTL',mr.computed.bqc.eqtl,'B2',22,c('ENSG00000262539.1','ENSG00000073969.18','ENSG00000142233.14'))
+mr.plot.bqc.eqtl.c2 = plotMRResults('bqc','eQTL',mr.computed.bqc.eqtl,'C2',22,c('ENSG00000142233.14'))
+mr.plot.gtex.eqtl.a2 = plotMRResults('gtex','eQTL',mr.computed.gtex.eqtl,'A2',13,c('ENSG00000238160.1','ENSG00000214401.4'))
+mr.plot.gtex.eqtl.b2 = plotMRResults('gtex','eQTL',mr.computed.gtex.eqtl,'B2',13,c('ENSG00000238160.1','ENSG00000214401.4'))
+mr.plot.gtex.eqtl.c2 = plotMRResults('gtex','eQTL',mr.computed.gtex.eqtl,'C2',13,c('ENSG00000142233.11'))
+
+#Plot MR results sQTL
+mr.plot.bqc.sqtl.a2 = plotMRResults('bqc','sQTL',mr.computed.bqc.sqtl,'A2',39,c('chr12:112911258:112916509:clu_9748_+:ENSG00000089127.15','chr12:112911235:112916509:clu_9748_+:ENSG00000089127.15','chr17:46038686:46039702:clu_17314_-:ENSG00000120071.15','chr17:46094701:46170855:clu_18029_-:ENSG00000120071.15','chr19:48662041:48663463:clu_21139_-:ENSG00000142233.14','chr19:49670488:49673698:clu_22852_+:ENSG00000126453.10','chr21:33230216:33241840:clu_28170_+:ENSG00000159110.21','chr21:33230216:33241886:clu_28170_+:ENSG00000159110.21'))
+mr.plot.bqc.sqtl.b2 = plotMRResults('bqc','sQTL',mr.computed.bqc.sqtl,'B2',39,c('chr9:132935095:132944543:clu_41810_-:ENSG00000165699.15','chr12:112911235:112916509:clu_9748_+:ENSG00000089127.15','chr17:46038686:46039702:clu_17314_-:ENSG00000120071.15','chr17:46094701:46170855:clu_18029_-:ENSG00000120071.15','chr19:48662041:48663463:clu_21139_-:ENSG00000142233.14'))
+mr.plot.bqc.sqtl.c2 = plotMRResults('bqc','sQTL',mr.computed.bqc.sqtl,'C2',39,c('chr9:132935095:132944543:clu_41810_-:ENSG00000165699.15','chr12:112911258:112916509:clu_9748_+:ENSG00000089127.15','chr12:112911235:112916509:clu_9748_+:ENSG00000089127.15','chr19:48662041:48663463:clu_21139_-:ENSG00000142233.14','chr21:33230216:33241840:clu_28170_+:ENSG00000159110.21'))
+mr.plot.gtex.sqtl.a2 = plotMRResults('gtex','sQTL',mr.computed.gtex.sqtl,'A2',16,c('chr1:155732033:155736946:clu_43109:ENSG00000132676.15','chr1:155737063:155738157:clu_43109:ENSG00000132676.15','chr5:131988226:131988805:clu_31067:ENSG00000164398.12','chr10:79808832:79814613:clu_8678:ENSG00000225484.6','chr10:79766324:79804485:clu_8677:ENSG00000225484.6','chr17:46172232:46192823:clu_11356:ENSG00000120071.13','chr17:46094701:46170855:clu_11354:ENSG00000120071.13','chr17:46038686:46039702:clu_11351:ENSG00000120071.13','chr19:10351162:10352434:clu_19126:ENSG00000105397.13','chr21:33230216:33241840:clu_24781:ENSG00000159110.19','chr21:33230216:33241886:clu_24781:ENSG00000159110.19','chr21:33252830:33260597:clu_24783:ENSG00000159110.19'))
+mr.plot.gtex.sqtl.b2 = plotMRResults('gtex','sQTL',mr.computed.gtex.sqtl,'B2',16,c('chr1:155732033:155736946:clu_43109:ENSG00000132676.15','chr1:155737063:155738157:clu_43109:ENSG00000132676.15','chr17:46094701:46170855:clu_11354:ENSG00000120071.13','chr17:46038686:46039702:clu_11351:ENSG00000120071.13','chr19:10351162:10352434:clu_19126:ENSG00000105397.13','chr21:33230216:33241840:clu_24781:ENSG00000159110.19','chr21:33230216:33241886:clu_24781:ENSG00000159110.19','chr21:33252830:33260597:clu_24783:ENSG00000159110.19'))
+mr.plot.gtex.sqtl.c2 = plotMRResults('gtex','sQTL',mr.computed.gtex.sqtl,'C2',16,c('chr19:10353098:10354042:clu_19127:ENSG00000105397.13','chr21:33230216:33241840:clu_24781:ENSG00000159110.19','chr21:33230216:33241886:clu_24781:ENSG00000159110.19','chr21:33252830:33260597:clu_24783:ENSG00000159110.19'))
+
+#logistic regression
+# il10rb.a2 = doLogisticAnalysis('A2','IL10RB')
+# oas1.a2 = doLogisticAnalysis('A2','OAS1')
+# rab2a.b2 = doLogisticAnalysis('B2','RAB2A')
+# abo.b2 = doLogisticAnalysis('B2','ABO')
+# oas1.b2 = doLogisticAnalysis('B2','OAS1')
+# adam15.c2 = doLogisticAnalysis('C2','ADAM15')
+# oas1.c2 = doLogisticAnalysis('C2','OAS1')
+# tyk2.c2 = doLogisticAnalysis('C2','TYK2')
+# protein.analysis = list(il10rb.a2,oas1.a2,rab2a.b2,abo.b2,oas1.b2,adam15.c2,oas1.c2,tyk2.c2)
+saveRDS(protein.analysis,'somalogic_protein_analysis.rds')
+fig.data = plotOddsRatios(protein.analysis,c('A2 IL10RB','A2 OAS1','B2 RAB2A','B2 ABO',
+                                             'B2 OAS1','C2 ADAM15','C2 OAS1','C2 TYK2'))
