@@ -127,6 +127,9 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
   
   for (file in 1:length(files)) { #already removed data for loci in MHC
     if (str_detect(files[[file]],'mr_results_all.rds')) next
+    else if (str_detect(files[[file]],'coloc_results_all.rds')) next
+    else if (str_detect(files[[file]],'coloc_sens_all.rds')) next
+    else if (str_detect(files[[file]],'heatmap_data.rds')) next
     print(glue('Curr file: {files[[file]]}'))
     f.check = sub('.*\\/','',files[[file]])
     f.check = sub('\\.rds','',f.check)
