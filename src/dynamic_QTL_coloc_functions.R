@@ -1,9 +1,9 @@
-getHGIData = function(HGI,chr,lead.snp.position,curr.outcome,MR) {
+getHGIData = function(HGI,chr,lead.snp.position,MR) {
   print('Reading hgi data')
   names(HGI)[1] = 'CHR'
 
   hgi = HGI %>% subset(CHR == chr) %>% mutate(varbeta=all_inv_var_meta_sebeta^2) %>% 
-    dplyr::filter(!duplicated(SNP),!is.na(varbeta)) %>%
+    dplyr::filter(!duplicated(SNP),!is.na(varbeta),varbeta!=0) %>%
     dplyr::rename(position=POS,beta=all_inv_var_meta_beta,MAF=all_meta_AF,
                   pvalues=all_inv_var_meta_p,se=all_inv_var_meta_sebeta) %>%
     mutate(variant_id=paste0('chr',SNP))
@@ -15,10 +15,12 @@ getHGIData = function(HGI,chr,lead.snp.position,curr.outcome,MR) {
   
   return(hgi %>% dplyr::filter(!is.na(MAF)))
 }
-getCommonQTLLists = function(mqtl,hgi,infectious,curr.outcome) {
+getCommonQTLLists = function(mqtl,hgi) {
   common.snps = inner_join(mqtl,hgi,by='variant_id') %>% dplyr::select(variant_id)
-  mqtl.common = inner_join(mqtl,common.snps,by='variant_id') %>% arrange(position,pvalues)
-  hgi.common = inner_join(hgi,common.snps,by='variant_id') %>% arrange(position,pvalues)
+  mqtl.common = inner_join(mqtl,common.snps,by='variant_id') %>% arrange(position,pvalues) %>%
+    dplyr::filter(varbeta!=0)
+  hgi.common = inner_join(hgi,common.snps,by='variant_id') %>% arrange(position,pvalues) %>%
+    dplyr::filter(varbeta!=0)
 
   mqtl.list = as.list(mqtl.common)
   mqtl.list$snp=mqtl.list$variant_id
@@ -41,19 +43,13 @@ makeTxtAllSoskicParquets = function() {
                 quote="none")
   }
 }
-soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr) {
+soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr,specific.getdf) {
   df = data.frame(Cell=character(),Outcome=character(),CHR=numeric(),POS=numeric(),
                   H0.PP=numeric(),
                   H1.PP=numeric(),H2.PP=numeric(),H3.PP=numeric(),
-                  H4.PP=numeric(),LeadSNP_eQTL=character(),LeadSNP_HGI=character(),Gene=character(),
-                  Lead_eQTL_Beta=numeric(),Lead_eQTL_P=numeric(),
-                  Lead_HGI_Beta=numeric(),Lead_HGI_P=numeric(),
-                  HGI_MAF=numeric())
-  loci = read.table('subpositions_chrpos.txt') #rel7
-  
-  names(loci) = c('chr','pos','outcome')
-  print('Reading hgi gwas')
-  
+                  H4.PP=numeric(),Gene=character())
+  loci = read.table('subpositions_chrpos.txt') ; names(loci) = c('chr','pos','outcome')
+
   if (is.null(vector.specific)) {
     hgi.a2 = vroom(glue('HGI_Data/COVID19_HGI_A2_ALL_eur_leave23andme_20220403.tsv.gz'),show_col_types = F)
     hgi.b2 = vroom(glue('HGI_Data/COVID19_HGI_B2_ALL_eur_leave23andme_20220403.tsv.gz'),show_col_types = F)
@@ -73,9 +69,9 @@ soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr) {
     }
     print(glue('Investigating outcome {outcome} chr{curr.chr} pos{targ.pos}'))
     
-    if (outcome == 'A2') hgiQTL = getHGIData(hgi.a2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
-    else if (outcome == 'B2') hgiQTL = getHGIData(hgi.b2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
-    else if (outcome == 'C2') hgiQTL = getHGIData(hgi.c2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
+    if (outcome == 'A2') hgiQTL = getHGIData(hgi.a2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
+    else if (outcome == 'B2') hgiQTL = getHGIData(hgi.b2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
+    else if (outcome == 'C2') hgiQTL = getHGIData(hgi.c2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
     
     if (!allCells) cells = c('CD4_Memory','CD4_Naive','TN_0h','TN_16h','TN_40h','TN_5d',
                              'TCM_','TEM_0h','TEM_16h','TEM_40h','TEM_5d','TEMRA_',
@@ -98,7 +94,7 @@ soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr) {
         full.mQTL = vroom(file,show_col_types=F) %>% dplyr::filter(CHR==curr.chr) %>% dplyr::filter(POS >= targ.pos-500000,POS <= targ.pos+500000)
         if (nrow(full.mQTL) < 1) { print('No rows in full mQTL') ; next }
         all.genes = unique(full.mQTL[['phenotype_id']])
-        if (!is.null(vector.specific)) {
+        if (!is.null(vector.specific)) { #select for gene
           if (vector.specific[[6]] %in% all.genes) print('Gene in the given mQTL data')
           else print('Gene not in mQTL data, ie not expressed')
         }
@@ -108,16 +104,15 @@ soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr) {
           }
           mQTL = full.mQTL %>% dplyr::filter(phenotype_id == gene) %>% 
             mutate(N=round(ma_count/maf*(1/2)))
-          if (nrow(mQTL) == 0) { print(glue('No rows {gene}')) ; next}
           mQTL %<>% dplyr::rename(beta=slope,se=slope_se,pvalues=pval_nominal,MAF=maf,
                                   chr=CHR,position=POS) %>% mutate(varbeta=se^2) %>%
             dplyr::select(chr,position,REF,ALT,beta,varbeta,pvalues,MAF,variant_id,phenotype_id,ma_samples,N,se) %>%
             dplyr::filter(!is.na(variant_id),!duplicated(variant_id),!is.na(varbeta),
                           pvalues < 1) #coloc freaks out if pvalue = 1
           mQTL %<>% mutate(variant_id = glue('chr{mQTL$chr}:{mQTL$position}:{mQTL$REF}:{mQTL$ALT}'))
-          if (nrow(mQTL) == 0) { print(glue('No rows {gene}')) ; next}
+          if (nrow(mQTL) == 0) { print(glue('No rows left {gene}')) ; next}
           
-          common.qtls.list = getCommonQTLLists(mQTL,hgiQTL,group.infectious,outcome)
+          common.qtls.list = getCommonQTLLists(mQTL,hgiQTL)
           if (length(common.qtls.list[[1]][['pvalues']]) == 0) { print(glue('No overlapping rows {file}')) ; break }
           if (length(common.qtls.list[[1]][['pvalues']]) < 50) {
             if (!is.null(vector.specific)) print(glue('Not enough variant On locus {item} of {nrow(loci)}, cell {cell}'))
@@ -126,44 +121,29 @@ soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr) {
 
           if (returnCommonQTLs & !is.null(vector.specific)) return(list(mQTL,hgiQTL))
           coloc.res = coloc.abf(common.qtls.list[[1]],common.qtls.list[[2]])
-          if (!is.null(vector.specific)) {
+          if (!is.null(vector.specific) & !specific.getdf) {
             print(glue('Overlapped rows: {nrow(common.qtls.list[[1]])}'))
             sens = sensitivity(coloc.res,rule='H4 > 0.5')
             return(coloc.res)
           }
-          lead.eqtl.index = which(common.qtls.list[[1]][['pvalues']] == min(common.qtls.list[[1]][['pvalues']]))[[1]]
-          lead.hgi.index = which(common.qtls.list[[2]][['pvalues']] == min(common.qtls.list[[2]][['pvalues']]))[[1]]
-          lead.snp.eqtl = common.qtls.list[[1]][['variant_id']][[lead.eqtl.index]]
-          lead.snp.hgi = common.qtls.list[[2]][['variant_id']][[lead.hgi.index]]
-          eQTL.beta = common.qtls.list[[1]][['beta']][[lead.eqtl.index]]
-          eQTL.P = common.qtls.list[[1]][['pvalues']][[lead.eqtl.index]]
-          HGI.beta = common.qtls.list[[2]][['beta']][[lead.hgi.index]]
-          HGI.P = common.qtls.list[[2]][['pvalues']][[lead.hgi.index]]
-          HGI.maf = common.qtls.list[[2]][['MAF']][[lead.hgi.index]]
           coloc.res = coloc.res$summary
           df %<>% add_row(Cell=file,Outcome=outcome,CHR=curr.chr,POS=targ.pos,
                           H0.PP=coloc.res['PP.H0.abf'],H1.PP=coloc.res['PP.H1.abf'],
                           H2.PP=coloc.res['PP.H2.abf'],H3.PP=coloc.res['PP.H3.abf'],
-                          H4.PP=coloc.res['PP.H4.abf'],LeadSNP_eQTL=lead.snp.eqtl,LeadSNP_HGI=lead.snp.hgi,
-                          Gene=gene,
-                          Lead_eQTL_Beta=eQTL.beta,Lead_eQTL_P=eQTL.P,
-                          Lead_HGI_Beta=HGI.beta,Lead_HGI_P=HGI.P,
-                          HGI_MAF=HGI.maf)
-          if (!is.null(vector.specific)) print(glue('On locus {item} of {nrow(loci)}, cell {cell}'))
+                          H4.PP=coloc.res['PP.H4.abf'],Gene=gene)
+          if (!is.null(vector.specific) & specific.getdf) return(df)
+          if (is.null(vector.specific)) print(glue('On locus {item} of {nrow(loci)}, cell {cell}'))
         }
       }
     }
   }
   return(df %>% add_column('H3+H4'=df$H3.PP+df$H4.PP))
 }
-bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) {
+bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr,specific.getdf) {
   df = data.frame(InfState=character(),Outcome=character(),CHR=numeric(),POS=numeric(),
                   H0.PP=numeric(),
                   H1.PP=numeric(),H2.PP=numeric(),H3.PP=numeric(),
-                  H4.PP=numeric(),LeadSNP_eQTL=character(),LeadSNP_HGI=character(),Gene=character(),
-                  Lead_eQTL_Beta=numeric(),Lead_eQTL_P=numeric(),
-                  Lead_HGI_Beta=numeric(),Lead_HGI_P=numeric(),
-                  HGI_MAF=numeric())
+                  H4.PP=numeric(),Gene=character())
   loci = read.table('subpositions_chrpos.txt') #rel7
   
   names(loci) = c('chr','pos','outcome')
@@ -183,15 +163,15 @@ bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) {
     if (is.null(vector.specific)) print(glue('On row {item} of {nrow(loci)}'))
     curr.chr = loci[['chr']][[item]] ; targ.pos = loci[['pos']][[item]]
     outcome = loci[['outcome']][[item]]
-    if (!is.null(vector.specific)) {
+    if (!is.null(vector.specific)) { #match for outcome when using vector specific
       if (outcome != vector.specific[[1]]) next
       else if (curr.chr != vector.specific[[2]] | targ.pos != vector.specific[[3]]) next
     }
     print(glue('Investigating outcome {outcome} chr{curr.chr} pos{targ.pos}'))
     
-    if (outcome == 'A2') hgiQTL = getHGIData(hgi.a2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
-    else if (outcome == 'B2') hgiQTL = getHGIData(hgi.b2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
-    else if (outcome == 'C2') hgiQTL = getHGIData(hgi.c2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
+    if (outcome == 'A2') hgiQTL = getHGIData(hgi.a2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
+    else if (outcome == 'B2') hgiQTL = getHGIData(hgi.b2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
+    else if (outcome == 'C2') hgiQTL = getHGIData(hgi.c2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
     
     inf.state = c('inf','noninf')
     
@@ -219,11 +199,11 @@ bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) {
                                 chr=CHR,position=POS,phenotype_id=gene_id) %>% mutate(varbeta=se^2) %>%
           dplyr::select(chr,position,REF,ALT,beta,varbeta,pvalues,MAF,variant_id,phenotype_id,ma_samples,N,se) %>%
           dplyr::filter(!is.na(variant_id),!duplicated(variant_id),!is.na(varbeta),
-                        pvalues < 1) #coloc freaks out if pvalue = 1
+                        pvalues < 1,varbeta != 0) #coloc freaks out if pvalue = 1
         mQTL %<>% mutate(variant_id = glue('{mQTL$chr}:{mQTL$position}:{mQTL$REF}:{mQTL$ALT}'))
         if (nrow(mQTL) == 0) { print(glue('No rows {gene}')) ; next}
         
-        common.qtls.list = getCommonQTLLists(mQTL,hgiQTL,group.infectious,outcome)
+        common.qtls.list = getCommonQTLLists(mQTL,hgiQTL)
         if (returnCommonQTLs & !is.null(vector.specific)) return(list(mQTL,hgiQTL))
         
         if (length(common.qtls.list[[1]][['pvalues']]) == 0) { print(glue('No overlapping rows')) ; break }
@@ -235,29 +215,16 @@ bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) {
         coloc.res = tryCatch(coloc.abf(common.qtls.list[[1]],common.qtls.list[[2]]),
                              error = function(c) {print(glue('Error for {gene} for loci {item} - likely no expression')) ; error.next <<- T})
         if (error.next) next
-        if (!is.null(vector.specific)) {
+        if (!is.null(vector.specific) & !specific.getdf) {
           print(glue('Overlapped rows: {nrow(common.qtls.list[[1]])}'))
           sens = sensitivity(coloc.res,rule='H4 > 0.5')
           return(coloc.res)
         }
-        lead.eqtl.index = which(common.qtls.list[[1]][['pvalues']] == min(common.qtls.list[[1]][['pvalues']]))[[1]]
-        lead.hgi.index = which(common.qtls.list[[2]][['pvalues']] == min(common.qtls.list[[2]][['pvalues']]))[[1]]
-        lead.snp.eqtl = common.qtls.list[[1]][['variant_id']][[lead.eqtl.index]]
-        lead.snp.hgi = common.qtls.list[[2]][['variant_id']][[lead.hgi.index]]
-        eQTL.beta = common.qtls.list[[1]][['beta']][[lead.eqtl.index]]
-        eQTL.P = common.qtls.list[[1]][['pvalues']][[lead.eqtl.index]]
-        HGI.beta = common.qtls.list[[2]][['beta']][[lead.hgi.index]]
-        HGI.P = common.qtls.list[[2]][['pvalues']][[lead.hgi.index]]
-        HGI.maf = common.qtls.list[[2]][['MAF']][[lead.hgi.index]]
         coloc.res = coloc.res$summary
         df %<>% add_row(InfState=state,Outcome=outcome,CHR=curr.chr,POS=targ.pos,
                         H0.PP=coloc.res['PP.H0.abf'],H1.PP=coloc.res['PP.H1.abf'],
                         H2.PP=coloc.res['PP.H2.abf'],H3.PP=coloc.res['PP.H3.abf'],
-                        H4.PP=coloc.res['PP.H4.abf'],LeadSNP_eQTL=lead.snp.eqtl,LeadSNP_HGI=lead.snp.hgi,
-                        Gene=gene,
-                        Lead_eQTL_Beta=eQTL.beta,Lead_eQTL_P=eQTL.P,
-                        Lead_HGI_Beta=HGI.beta,Lead_HGI_P=HGI.P,
-                        HGI_MAF=HGI.maf)
+                        H4.PP=coloc.res['PP.H4.abf'],Gene=gene)
         print(glue('On locus {item} of {nrow(loci)}, inf.state {state}'))
       }
     }
@@ -801,15 +768,18 @@ doLogisticAnalysis = function(outcome,analyte) {
   #need centre of recruitment as covariate
   return(modl)
 }
-plotOddsRatios = function(modls,proteins) {
-  df = data.frame(Product=character(),Outcome=character(),Beta=numeric(),SE=numeric())
+plotOddsRatios = function(modls,proteins,keep.indices) {
+  df = data.frame(Product=character(),Beta=numeric(),SE=numeric())
   for (modl in 1:length(modls)) {
+    if (modl %notin% keep.indices) next
     curr.modl = modls[[modl]]
-    
+
     df %<>% add_row(Product=proteins[[modl]],Beta=summary(curr.modl)$coefficients[4,1],
                     SE=summary(curr.modl)$coefficients[4,2]) %>% 
       mutate(Significant=summary(curr.modl)$coefficients[4,4] <= 0.05/length(proteins))
   }
+  df %<>% mutate(Product = str_replace(Product,'B2','Hospitalized'))
+  df %<>% mutate(Product = str_replace(Product,'C2','Susceptibility'))
   print(ggplot(df,aes(y=Product,x=exp(Beta),xmin=exp(Beta-1.96*SE),xmax=exp(Beta+1.96*SE),color=Significant)) +
           geom_point() + geom_errorbar(width=0.2) + xlab('Odds ratio') +
           scale_y_discrete(limits=rev) + theme_bw() + theme(text=element_text(size=24),legend.position='None') +
