@@ -4,7 +4,7 @@ getHGIGwasData = function(out) { #take in string for outcome
   else if (out == 'C2') hgi = vroom(glue('HGI_Data/COVID19_HGI_C2_ALL_eur_leave23andme_20220403.tsv.gz'),show_col_types = F)
   return(hgi)
 }
-getAllMRDataReady.MRthenColoc = function(dataset,type.of.qtl) {
+getAllMRDataReady.MRthenColoc = function(dataset,type.of.qtl) { #time intensive gather all data for MR to streamline the process
   loci = read.table('subpositions_chrpos.txt') ; names(loci) = c('Chr','Pos','Outcome')
   loci %<>% dplyr::arrange(Outcome)
   df.mr = data.frame(Label=character(),nSnps=numeric(),Beta=numeric(),SE=numeric(),
@@ -360,7 +360,7 @@ colocFromMR = function(dataset,type.of.qtl,mr.data,sens.data) {
   if (is.null(sens.data)) return(df)
   else return(list(sens.tests.list,df,coloc.mr.df))
 }
-doSensTesting = function(data,sens.data,index) {
+doSensTesting = function(data,sens.data,index) { #sensitivity testing for colocalization
   print(glue('Num cases strong colocalization: {nrow(data %>% subset(H4.PP>=0.8))}'))
   strong.coloc = (data %>% dplyr::filter(H4.PP >= 0.8))[index,]
   print(paste(strong.coloc$Outcome,strong.coloc$Cell,strong.coloc$InfState,strong.coloc$Gene))
@@ -408,7 +408,7 @@ plotSignificantMR = function(data.source,outcome,mr.coloc.data,drop.indices) { #
   print(plt)
   return(df)
 }
-getCellandTime = function(cell.state) {
+getCellandTime = function(cell.state) { #get cell name and time to streamline data processing
   spl = str_split(cell.state,'_')[[1]]
   if (str_detect(cell.state,'CD4_Memory')) { cell = 'CD4_Memory' ; time = spl[[4]] }
   else if (str_detect(cell.state,'CD4_Naive')) { cell = 'CD4_Naive' ; time = spl[[4]] }
