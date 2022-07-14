@@ -4,7 +4,7 @@ getHGIGwasData = function(out) { #take in string for outcome
   else if (out == 'C2') hgi = vroom(glue('HGI_Data/COVID19_HGI_C2_ALL_eur_leave23andme_20220403.tsv.gz'),show_col_types = F)
   return(hgi)
 }
-getAllMRDataReady.MRthenColoc = function(dataset,type.of.qtl) { #time intensive gather all data for MR to streamline the process
+getAllMRDataReady.MRthenColoc = function(dataset,type.of.qtl) {
   loci = read.table('subpositions_chrpos.txt') ; names(loci) = c('Chr','Pos','Outcome')
   loci %<>% dplyr::arrange(Outcome)
   df.mr = data.frame(Label=character(),nSnps=numeric(),Beta=numeric(),SE=numeric(),
@@ -114,10 +114,11 @@ getAllMRDataReady.MRthenColoc = function(dataset,type.of.qtl) { #time intensive 
     }
   }
 }
-conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
+conductMR.MRthenColoc = function(dataset,type.of.qtl,rev,recollect) {
   to.return = data.frame(Label=character(),nSnps=numeric(),Beta=numeric(),SE=numeric(),
                          Pval=numeric(),WMedianBeta=numeric(),WModeBeta=numeric(),
-                         EggerBeta=numeric(),EggerInterceptP=numeric(),SteigerP=numeric())
+                         EggerBeta=numeric(),EggerInterceptP=numeric(),SteigerP=numeric(),
+                         LeaveOneOutP=numeric())
   if (dataset == 'soskic') path = 'MRthenColoc_MRData'
   else if (dataset == 'bqc' & type.of.qtl == 'eQTL') path = 'MRthenColoc_MRData_BQC_eQTL'
   else if (dataset == 'gtex' & type.of.qtl == 'eQTL') path = 'MRthenColoc_MRData_GTEx_eQTL'
@@ -126,6 +127,7 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
   else files = sort(list.files(path,pattern='rds',full.names=T),decreasing=T)
   
   for (file in 1:length(files)) { #already removed data for loci in MHC
+    missing.rsids = vroom('missing_rsids.txt',show_col_types = FALSE)
     if (str_detect(files[[file]],'mr_results_all.rds')) next
     else if (str_detect(files[[file]],'coloc_results_all.rds')) next
     else if (str_detect(files[[file]],'coloc_sens_all.rds')) next
@@ -135,7 +137,7 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
     f.check = sub('\\.rds','',f.check)
     f.check = glue('{f.check}_mrresults.rds')
     file.processed = (f.check %in% list.files(glue('{path}/MR_Results')))
-    if (file.processed) {
+    if (file.processed & !recollect) {
       tmp = readRDS(glue('{path}/MR_Results/{f.check}'))
       to.return %<>% add_row(tmp)
       next
@@ -144,10 +146,11 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
     curr.results = readRDS(files[[file]])
     tmp.curr.mr = data.frame(Label=character(),nSnps=numeric(),Beta=numeric(),SE=numeric(),
                              Pval=numeric(),WMedianBeta=numeric(),WModeBeta=numeric(),
-                             EggerBeta=numeric(),EggerInterceptP=numeric(),SteigerP=numeric())
+                             EggerBeta=numeric(),EggerInterceptP=numeric(),SteigerP=numeric(),
+                             LeaveOneOutP=numeric())
     
     for (item in 1:length(curr.results[[1]])) {
-      print(glue('Doing MR {item} of {length(curr.results[[1]])}'))
+      print(glue('Doing MR {item} of {length(curr.results[[1]])}, file: {files[[file]]}'))
       common.qtls = curr.results[[1]][[item]] ; rsids = common.qtls[[2]][['rsid']]
       
       #prep exposure data. 
@@ -157,8 +160,22 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
         if (exp.rsid.df$VID[[item2]] %in% common.qtls[[2]][['variant_id']]) {
           exp.rsid.df$Rsid[[item2]] = rsids[which(common.qtls[[2]][['variant_id']]==exp.rsid.df$VID[[item2]])]
           num.overlap = num.overlap + 1
+        }else if (exp.rsid.df$VID[[item2]] %in% missing.rsids$VID) {
+          exp.rsid.df$Rsid[[item2]] = missing.rsids$RSID[which(missing.rsids$VID == exp.rsid.df$VID[[item2]])]
+        }else{ #ie missing rsid
+          curr.row = common.qtls[[1]][item2,]
+          rs.error = F
+          rs = tryCatch(get_rsid_from_position(chrom=curr.row$chr,pos=curr.row$position,ref=curr.row$REF,
+                                      alt=curr.row$ALT,assembly='hg38'),
+                        error = function(c) {print(glue('Missing rsid for: {curr.row$variant_id}')) ; rs.error <<- T})
+          if (!rs.error) missing.rsids %<>% add_row(VID = curr.row$variant_id,RSID = rs)
+          exp.rsid.df$Rsid[[item2]] = rs
         }
       }
+      print(glue('Num remaining missing rsids in exposure: {length(which(is.na(exp.rsid.df$Rsid)))}'))
+      print(glue('On test {nrow(tmp.curr.mr)} in {files[[file]]}'))
+      vroom_write(missing.rsids,'missing_rsids.txt')
+
       if (num.overlap < 50) {print('Fewer than 50 variants shared') ; next} #follow reasoning by soskic
       
       exposure.data = data.frame(chr=common.qtls[[1]][['chr']],position=common.qtls[[1]][['position']],
@@ -180,6 +197,15 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
       
       #harmonize and Steiger
       harmonized = harmonise_data(exposure.data,outcome.data)
+      if (nrow(harmonized) < nrow(exposure.data)) {
+        print('Lost SNPs when harmonized, need to get proxy')
+        rsid.non.overlap = exposure.data[['SNP']][which(exposure.data[['SNP']] %notin% outcome.data[['SNP']])]
+        proxy = getProxy(rsid.non.overlap)
+        if (proxy == 'MissingRs') {
+          print(glue('Missing proxy for {rsid.non.overlap}'))
+          return(outcome.data)
+        }
+      }
       steiger = directionality_test(harmonized)
       
       #do mr functions
@@ -188,9 +214,11 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
         result = mr(harmonized, method_list = "mr_wald_ratio")
         tmp.curr.mr %<>% add_row(Label=curr.results[[2]][[item]],nSnps=result$nsnp,Beta=result$b,
                                  SE=result$se,Pval=result$pval,WMedianBeta=NA,WModeBeta=NA,
-                                 EggerBeta=NA,EggerInterceptP=NA,SteigerP=steiger$steiger_pval)
+                                 EggerBeta=NA,EggerInterceptP=NA,SteigerP=steiger$steiger_pval,
+                                 LeaveOneOutP=NA)
       }else if (sum(harmonized$mr_keep)>1) {
         result <- mr(harmonized, method_list = c("mr_ivw","mr_two_sample_ml","mr_weighted_median","mr_penalised_weighted_median","mr_weighted_mode"))
+        leaveoneout = mr_leaveoneout(harmonized)
         if (sum(harmonized$mr_keep)>2) {
           egger_result <- mr_egger_regression(harmonized$beta.exposure[harmonized$mr_keep],
                                               harmonized$beta.outcome[harmonized$mr_keep],
@@ -200,12 +228,15 @@ conductMR.MRthenColoc = function(dataset,type.of.qtl,rev) {
           tmp.curr.mr %<>% add_row(Label=curr.results[[2]][[item]],nSnps=result$nsnp[1],Beta=result$b[1],
                                    SE=result$se[1],Pval=result$pval[1],WMedianBeta=result$b[3],
                                    WModeBeta=result$b[5],EggerBeta=egger_result$b,
-                                   EggerInterceptP=egger_result$pval_i,SteigerP=steiger$steiger_pval)
+                                   EggerInterceptP=egger_result$pval_i,SteigerP=steiger$steiger_pval,
+                                   LeaveOneOutP=leaveoneout$p)
         } else {
           tmp.curr.mr %<>% add_row(Label=curr.results[[2]][[item]],nSnps=result$nsnp[1],Beta=result$b[1],
                                    SE=result$se[1],Pval=result$pval[1],WMedianBeta=NA,WModeBeta=NA,
-                                   EggerBeta=NA,EggerInterceptP=NA,SteigerP=steiger$steiger_pval)
+                                   EggerBeta=NA,EggerInterceptP=NA,SteigerP=steiger$steiger_pval,
+                                   LeaveOneOutP=leaveoneout$p)
         }
+        if (result$pval[1] <= 0.05) return(harmonized)
       }
     }
     to.return %<>% add_row(tmp.curr.mr)
@@ -363,7 +394,7 @@ colocFromMR = function(dataset,type.of.qtl,mr.data,sens.data) {
   if (is.null(sens.data)) return(df)
   else return(list(sens.tests.list,df,coloc.mr.df))
 }
-doSensTesting = function(data,sens.data,index) { #sensitivity testing for colocalization
+doSensTesting = function(data,sens.data,index) {
   print(glue('Num cases strong colocalization: {nrow(data %>% subset(H4.PP>=0.8))}'))
   strong.coloc = (data %>% dplyr::filter(H4.PP >= 0.8))[index,]
   print(paste(strong.coloc$Outcome,strong.coloc$Cell,strong.coloc$InfState,strong.coloc$Gene))
@@ -411,7 +442,7 @@ plotSignificantMR = function(data.source,outcome,mr.coloc.data,drop.indices) { #
   print(plt)
   return(df)
 }
-getCellandTime = function(cell.state) { #get cell name and time to streamline data processing
+getCellandTime = function(cell.state) {
   spl = str_split(cell.state,'_')[[1]]
   if (str_detect(cell.state,'CD4_Memory')) { cell = 'CD4_Memory' ; time = spl[[4]] }
   else if (str_detect(cell.state,'CD4_Naive')) { cell = 'CD4_Naive' ; time = spl[[4]] }
@@ -533,11 +564,12 @@ plotColocHeatmap = function(dataset,mr.plot.data,coloc.data) {
     plot.df %<>% mutate(OutcomeGene = str_replace(OutcomeGene,'C2','Susceptibility'))
     plt = ggplot(plot.df,aes(x=State,y=OutcomeGene,fill=H4.PP)) +
       scale_y_discrete(limits=rev(c('Severe HIP1','Severe IFNAR2','Severe JD275616',
-                                    'Hospitalized ABO','Hospitalized IFNAR2','Susceptibility NAPSB')))
+                                    'Hospitalized ABO','Hospitalized IFNAR2','Susceptibility NAPSB'))) +
+      scale_x_discrete(limits=c('Noninf','Inf'))
   }
-  plt = plt + geom_tile() + theme_bw() + theme(text=element_text(size=28)) +
-            ylab('') + geom_point(data=plot.df %>% dplyr::filter(H4.PP>=0.8),size=4,
-                                  shape=18) + scale_fill_continuous(limits=c(0,1))
+  plt = plt + geom_tile(aes(linetype=(H4.PP>=0.8)),show.legend=F) + theme_bw() + theme(text=element_text(size=28)) +
+            ylab('') + scale_fill_continuous(limits=c(0,1)) +
+    geom_text(aes(label=round(H4.PP,2)),color='white',size=10)
   print(plt)
 
   return(new.plot.data)

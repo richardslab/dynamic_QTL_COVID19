@@ -1,36 +1,21 @@
+getProxy = function(rs) { #minimum R2 for proxy is 0.8
+  if (rs == 'rs10479009') return('No proxies') #best rs62385261 R2 0.7964
+  else if (rs == 'rs708455') return('No proxies')
+  else if (rs == 'rs564898521') return('No proxies') #not in reference panel LDLink
+  else if (rs == 'rs200591918') return('No proxies') #not in ref panel
+  else if (rs == 'rs9687004') return('No proxies') #not in ref panel
+  else return('MissingRs')
+}
 replaceGeneNames = function(n) {
   new.names = n
   
-  #rename sQTLs
-  new.names[which(str_detect(new.names,'chr1:155210627:155212090') & str_detect(new.names,'ENSG00000173171'))] = 'MTX1 Splice Variant A'
-  new.names[which(str_detect(new.names,'chr1:155921527:155921861') & str_detect(new.names,'ENSG00000132680'))] = 'KHDC4 Splice Variant A'
-  new.names[which(str_detect(new.names,'chr8:60572113:60576234') & str_detect(new.names,'ENSG00000104388'))] = 'RAB2A Splice Variant A'
-  new.names[which(str_detect(new.names,'chr8:60576297:60584208') & str_detect(new.names,'ENSG00000104388'))] = 'RAB2A Splice Variant B'
-  new.names[which(str_detect(new.names,'chr8:60572113:60584208') & str_detect(new.names,'ENSG00000104388'))] = 'RAB2A Splice Variant C'
-  new.names[which(str_detect(new.names,'chr12:112917700:112931878') & str_detect(new.names,'ENSG00000089127'))] = 'OAS1 Splice Variant A'
-  new.names[which(str_detect(new.names,'chr12:112917700:112919487') & str_detect(new.names,'ENSG00000089127'))] = 'OAS1 Splice Variant B'
-  new.names[which(str_detect(new.names,'chr12:112917700:112918597') & str_detect(new.names,'ENSG00000089127'))] = 'OAS1 Splice Variant C'
-  new.names[which(str_detect(new.names,'chr12:112917700:112919389') & str_detect(new.names,'ENSG00000089127'))] = 'OAS1 Splice Variant D'
-  new.names[which(str_detect(new.names,'chr12:112908824:112911098') & str_detect(new.names,'ENSG00000089127'))] = 'OAS1 Splice Variant E'
-  new.names[which(str_detect(new.names,'chr12:112908824:112911051') & str_detect(new.names,'ENSG00000089127'))] = 'OAS1 Splice Variant F'
-  new.names[which(str_detect(new.names,'chr12:112911258:112916509') & str_detect(new.names,'ENSG00000089127'))] = 'OAS1 Splice Variant G'
-  new.names[which(str_detect(new.names,'chr12:132581824:132582062') & str_detect(new.names,'ENSG00000112787'))] = 'FBRSL1 Splice Variant A'
-  new.names[which(str_detect(new.names,'chr19:10351162:10352926') & str_detect(new.names,'ENSG00000105397'))] = 'TYK2 Splice Variant A'
-  new.names[which(str_detect(new.names,'chr19:10359302:10361511') & str_detect(new.names,'ENSG00000105397'))] = 'TYK2 Splice Variant B'
-  new.names[which(str_detect(new.names,'chr19:10359302:10360962') & str_detect(new.names,'ENSG00000105397'))] = 'TYK2 Splice Variant C'
-  new.names[which(str_detect(new.names,'chr21:33252830:33268394') & str_detect(new.names,'ENSG00000159110'))] = 'IFNAR2 Splice Variant A'
-  new.names[which(str_detect(new.names,'chr21:33245074:33246254') & str_detect(new.names,'ENSG00000159110'))] = 'IFNAR2 Splice Variant B'
-  new.names[which(str_detect(new.names,'chr21:33245074:33246718') & str_detect(new.names,'ENSG00000159110'))] = 'IFNAR2 Splice Variant C'
-  new.names[which(str_detect(new.names,'chr21:33246482:33246718') & str_detect(new.names,'ENSG00000159110'))] = 'IFNAR2 Splice Variant D'
-  new.names[which(str_detect(new.names,'chr21:33230216:33241886') & str_detect(new.names,'ENSG00000159110'))] = 'IFNAR2 Splice Variant E'
-  new.names[which(str_detect(new.names,'chr21:33252830:33262561') & str_detect(new.names,'ENSG00000159110'))] = 'IFNAR2 Splice Variant F'
-  new.names[which(str_detect(new.names,'chr21:33252830:33268394') & str_detect(new.names,'ENSG00000243646'))] = 'IL10RB Splice Variant A'
-  
   #rename eQTLs
+  new.names = str_replace(new.names,'ENSG00000104388.15','RAB2A')
   new.names = str_replace(new.names,'ENSG00000104388','RAB2A')
   new.names = str_replace(new.names,'ENSG00000121691','CAT')
   new.names = str_replace(new.names,'ENSG00000130816','DNMT1')
   new.names = str_replace(new.names,'ENSG00000131400.7','NAPSA')
+  new.names = str_replace(new.names,'ENSG00000131400.8','NAPSA')
   new.names = str_replace(new.names,'ENSG00000131400','NAPSA')
   new.names = str_replace(new.names,'ENSG00000144802','NFKBIZ')
   new.names = str_replace(new.names,'ENSG00000166997','CNPY4')

@@ -1,4 +1,4 @@
-getHGIData = function(HGI,chr,lead.snp.position,MR) { #process HGI data for coloc
+getHGIData = function(HGI,chr,lead.snp.position,MR) {
   print('Reading hgi data')
   names(HGI)[1] = 'CHR'
 
@@ -15,7 +15,7 @@ getHGIData = function(HGI,chr,lead.snp.position,MR) { #process HGI data for colo
   
   return(hgi %>% dplyr::filter(!is.na(MAF)))
 }
-getCommonQTLLists = function(mqtl,hgi) { #process data for coloc
+getCommonQTLLists = function(mqtl,hgi) {
   common.snps = inner_join(mqtl,hgi,by='variant_id') %>% dplyr::select(variant_id)
   mqtl.common = inner_join(mqtl,common.snps,by='variant_id') %>% arrange(position,pvalues) %>%
     dplyr::filter(varbeta!=0)
@@ -33,7 +33,7 @@ getCommonQTLLists = function(mqtl,hgi) { #process data for coloc
 
   return(list(mqtl.list,hgi.list))
 }
-makeTxtAllSoskicParquets = function() { #process soskic data for my pipe
+makeTxtAllSoskicParquets = function() {
   files = list.files('Soskic_eQTL_summ_stats',pattern='.parquet',full.names=F)
   files = str_replace(files,'.parquet','')
   for (item in files) {
@@ -43,7 +43,7 @@ makeTxtAllSoskicParquets = function() { #process soskic data for my pipe
                 quote="none")
   }
 }
-soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr,specific.getdf) { #coloc for Soskic et al data, permitting looking at specific entry
+soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr,specific.getdf) {
   df = data.frame(Cell=character(),Outcome=character(),CHR=numeric(),POS=numeric(),
                   H0.PP=numeric(),
                   H1.PP=numeric(),H2.PP=numeric(),H3.PP=numeric(),
@@ -139,7 +139,7 @@ soskicColoc = function(vector.specific,allCells,returnCommonQTLs,mr,specific.get
   }
   return(df %>% add_column('H3+H4'=df$H3.PP+df$H4.PP))
 }
-bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr,specific.getdf) { #bqc coloc, used for single entries or all entries
+bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr,specific.getdf) {
   df = data.frame(InfState=character(),Outcome=character(),CHR=numeric(),POS=numeric(),
                   H0.PP=numeric(),
                   H1.PP=numeric(),H2.PP=numeric(),H3.PP=numeric(),
@@ -231,7 +231,7 @@ bqcColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr,specific.get
   }
   return(df %>% add_column('H3+H4'=df$H3.PP+df$H4.PP))
 }
-gtexColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) { #gtex coloc, permitting specific coloc or do all
+gtexColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) {
   df = data.frame(Outcome=character(),CHR=numeric(),POS=numeric(),
                   H0.PP=numeric(),
                   H1.PP=numeric(),H2.PP=numeric(),H3.PP=numeric(),
@@ -264,9 +264,9 @@ gtexColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) { #gtex co
     }
     print(glue('Investigating outcome {outcome} chr{curr.chr} pos{targ.pos}'))
     
-    if (outcome == 'A2') hgiQTL = getHGIData(hgi.a2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
-    else if (outcome == 'B2') hgiQTL = getHGIData(hgi.b2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
-    else if (outcome == 'C2') hgiQTL = getHGIData(hgi.c2,chr=curr.chr,lead.snp.position=targ.pos,outcome,MR=mr) #grch38
+    if (outcome == 'A2') hgiQTL = getHGIData(hgi.a2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
+    else if (outcome == 'B2') hgiQTL = getHGIData(hgi.b2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
+    else if (outcome == 'C2') hgiQTL = getHGIData(hgi.c2,chr=curr.chr,lead.snp.position=targ.pos,MR=mr) #grch38
     
     if (type.of.qtl == 'eQTL') full.mQTL = vroom(glue('GTEx_eQTL_Data/Subpositions/chr{curr.chr}_{targ.pos}_window.txt'),show_col_types=F)
     else if (type.of.qtl == 'sQTL') full.mQTL = vroom(glue('GTEx_sQTL_Data/Subpositions/chr{curr.chr}_{targ.pos}_window.txt'),show_col_types=F)
@@ -289,7 +289,7 @@ gtexColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) { #gtex co
       mQTL %<>% mutate(variant_id = glue('{mQTL$chr}:{mQTL$position}:{mQTL$REF}:{mQTL$ALT}'))
       if (nrow(mQTL) == 0) { print(glue('No rows {gene}')) ; next}
       
-      common.qtls.list = getCommonQTLLists(mQTL,hgiQTL,F,outcome)
+      common.qtls.list = getCommonQTLLists(mQTL,hgiQTL)
       if (returnCommonQTLs & !is.null(vector.specific)) return(list(mQTL,hgiQTL))
       
       if (length(common.qtls.list[[1]][['pvalues']]) == 0) { print(glue('No overlapping rows')) ; break }
@@ -329,7 +329,7 @@ gtexColoc = function(type.of.qtl,vector.specific,returnCommonQTLs,mr) { #gtex co
   }
   return(df %>% add_column('H3+H4'=df$H3.PP+df$H4.PP))
 }
-doAllSensTests = function(data.source,type.of.data,data) { # do all sens tests when did coloc on all entries rather than a single one
+doAllSensTests = function(data.source,type.of.data,data) {
   #collect the data so sensitivity tests can be done more quickly
   #skip chr6 because all loci are in MHC, that is not done in MR.
   #as an aside, even when chr6 is done, single causal variant assumption violated
@@ -375,7 +375,7 @@ doAllSensTests = function(data.source,type.of.data,data) { # do all sens tests w
   }
   return(list(plot.list,plot.label))
 }
-plotDynamicPP = function(data,cell,outcome,chromosomes,exclude.genes) { #plotting H4.PP when doing all coloc
+plotDynamicPP = function(data,cell,outcome,chromosomes,exclude.genes) {
   plot.data = data %>% dplyr::filter(str_detect(data$Cell,cell),Outcome==outcome,CHR %in% chromosomes)
   plot.data$Gene = replaceGeneNames(plot.data$Gene)
   
@@ -388,49 +388,18 @@ plotDynamicPP = function(data,cell,outcome,chromosomes,exclude.genes) { #plottin
                                                   !str_detect(plot.data$Cell,'TN_HSP'),
                                                   !str_detect(plot.data$Cell,'TN_LA'),
                                                   !str_detect(plot.data$Cell,'TN_NFKB'))
-  # colocalizing.genes = unique(plot.data[['Gene']][which(plot.data$H4.PP >= 0.8)])
-  colocalizing.genes = c('CAT','NAPSA','ACSF3','RALGDS','RAB2A','ADAM15') 
+  colocalizing.genes = unique(plot.data[['Gene']][which(plot.data$H4.PP >= 0.8)])
   plot.data %<>% dplyr::filter(Gene %in% colocalizing.genes)
   times = c('0h','16h','40h','5d')
-  plot.df = data.frame(Time=character(),PP=numeric(),Gene=character(),Position=numeric())
+  plot.df = data.frame(Cell=character(),Time=character(),PP=numeric(),Gene=character(),
+                       Chromosome=numeric(),Position=numeric())
   for (time in times) {
     time.rows = plot.data %>% dplyr::filter(str_detect(plot.data$Cell,glue('_{time}')))
-    plot.df %<>% add_row(Time = time,PP=time.rows$H4.PP,Gene=time.rows$Gene,
-                         Position=time.rows$POS)
+    plot.df %<>% add_row(Cell=cell,Time = time,PP=time.rows$H4.PP,Gene=time.rows$Gene,
+                         Chromosome=time.rows$CHR,Position=time.rows$POS)
   }
-  if (cell == 'CD4_Naive') cell.title = 'CD4 Antigen Naive'
-  else if (cell == 'CD4_Memory') cell.title = 'CD4 Memory'
-  else if (cell == 'T_ER-stress') cell.title = 'T_ER-stress'
-  else if (cell == 'TEM_') cell.title = 'TEM'
-  else if (cell == 'TN_HSP') cell.title = 'TN_HSP'
-  else if (cell == 'TCM_') cell.title = 'TCM'
-  else if (cell == 'TN_cycling') cell.title = 'TN_cycling'
-  else if (cell == 'TN_IFN') cell.title = 'TN_IFN'
-  else if (cell == 'TN_') cell.title = 'TN'
-  else cell.title = 'Missing Cell Title'
-  if (outcome == 'A2') text.outcome = 'Severe'
-  else if (outcome == 'B2') text.outcome = 'Hospitalized'
-  else if (outcome == 'C2') text.outcome = 'Susceptible'
-  
   plot.df %<>% dplyr::filter(!(Gene %in% exclude.genes))
-  
-  group.colors = c(CAT = '#F8766D',NAPSA = '#00BFC4',ACSF3='#00BA38',
-                   RALGDS = '#B79F00',RAB2A = '#619CFF',ADAM15='#F564E3')
-  group.shapes = c(CAT = 16,NAPSA = 17,ACSF3=15,RALGDS=3,RAB2A=7,ADAM15=8)
-  # groups.to.remove = numeric() ; genes.of.interest = c('CAT','NAPSA','ACSF3','RALGDS','RAB2A','ADAM15')
-  # for (g in 1:length(genes.of.interest)) {
-  #   if (genes.of.interest[[g]] %notin% plot.df$Gene) groups.to.remove %<>% append(g)
-  # }
-  # group.colors = group.colors[-groups.to.remove]
-  # group.shapes = group.shapes[-groups.to.remove]
-
-  plot = ggplot(plot.df,aes(x=Time,y=PP,group=Gene)) + geom_line(aes(color=Gene)) + theme_bw() +
-          geom_point(aes(shape=Gene),size=6) + theme(text=element_text(size=40)) + geom_hline(yintercept=0.8,linetype='dotted') +
-          #ggtitle(glue('Cell: {cell.title}. Outcome: {text.outcome}')) +
-          scale_x_discrete(limits=c('0h','16h','40h','5d')) + ylim(c(0,1))
-  plot = plot + scale_color_manual(values=group.colors) +
-    scale_shape_manual(values=group.shapes)
-  print(plot)
+  plotColocAll('soskic',plot.df)
   return(plot.df)
 }
 plotDynamicPP.BQC = function(data,outcome,type.of.qtl,chromosomes,exclude.genes) {
@@ -438,49 +407,20 @@ plotDynamicPP.BQC = function(data,outcome,type.of.qtl,chromosomes,exclude.genes)
 
   colocalizing.genes = unique(plot.data[['Gene']][which(plot.data$H4.PP >= 0.8)])
   plot.data %<>% dplyr::filter(Gene %in% colocalizing.genes)
-  plot.df = data.frame(State=character(),PP=numeric(),Gene=character(),Position=numeric())
+  plot.df = data.frame(State=character(),PP=numeric(),Gene=character(),
+                       Chromosome=numeric(),Position=numeric())
 
   plot.df %<>% add_row(State = plot.data$InfState,PP=plot.data$H4.PP,Gene=plot.data$Gene,
-                       Position=plot.data$POS)
-  
-  if (outcome == 'A2') text.outcome = 'Severe'
-  else if (outcome == 'B2') text.outcome = 'Hospitalized'
-  else if (outcome == 'C2') text.outcome = 'Susceptible'
+                       Chromosome=plot.data$CHR,Position=plot.data$POS)
   
   plot.df$Gene = replaceGeneNames(plot.df$Gene)
   
-  if (type.of.qtl == 'eQTL') { #not done for sQTLs because too many variants - made figures hard to appreciate
-    colocalizing.genes = c('ABO','HIP1','IFNAR2','JD275616','NAPSA','RAB2A',
-                           'GBAP1','NAPSB','THBS3','TYK2','ENSG00000279996.1')
-    plot.df %<>% dplyr::filter(Gene %in% colocalizing.genes)
-    hues = hue_pal()(length(colocalizing.genes))
-    group.colors = c(ABO=hues[1],HIP1=hues[2],IFNAR2=hues[3],
-                     JD275616=hues[4],NAPSA=hues[5],RAB2A=hues[6],
-                     GBAP1=hues[7],NAPSB=hues[8],THBS3=hues[9],TYK2=hues[10],
-                     ENSG00000279996.1=hues[11])
-    group.shapes = c(ABO=16,HIP1=17,IFNAR2=15,JD275616=3,NAPSA=7,
-                     RAB2A=8,GBAP1=1,NAPSB=2,THBS3=5,TYK2=6,ENSG00000279996.1=9)
-  }
-    
   plot.df %<>% dplyr::filter(Gene %notin% exclude.genes)
   if (outcome=='A2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2' & Position==33969937))
-  if (outcome=='A2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant A' & Position==33969937))
-  if (outcome=='A2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant B' & Position==33969937))
-  if (outcome=='A2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant E' & Position==33969937))
-  if (outcome=='A2') plot.df %<>% dplyr::filter(!(Gene=='IL10RB Splice Variant A' & Position==33969937))
   if (outcome=='B2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2' & Position==33940612))
-  if (outcome=='B2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant A' & Position==33940612))
-  if (outcome=='B2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant B' & Position==33940612))
-  if (outcome=='B2') plot.df %<>% dplyr::filter(!(Gene=='IL10RB Splice Variant A' & Position==33940612))
   
-  plot = ggplot(plot.df,aes(x=State,y=PP,group=Gene)) + theme_bw() +
-          geom_line(aes(color=Gene)) + geom_point(aes(shape=Gene),size=3) +
-          theme(text=element_text(size=24)) + geom_hline(yintercept=0.8,linetype='dotted') +
-          # ggtitle(glue('Outcome: {text.outcome}')) +
-          ylim(c(0,1)) + scale_x_discrete(limits=c('noninf','inf'))
-  if (type.of.qtl == 'eQTL') plot = plot + scale_color_manual(values=group.colors) +
-    scale_shape_manual(values=group.shapes)
-  print(plot)
+  plotColocAll('bqc',plot.df)
+  
   return(plot.df)
 }
 plotDynamicPP.GTEx = function(data,outcome,type.of.qtl,chromosomes,exclude.genes) {
@@ -488,10 +428,11 @@ plotDynamicPP.GTEx = function(data,outcome,type.of.qtl,chromosomes,exclude.genes
   
   colocalizing.genes = unique(plot.data[['Gene']][which(plot.data$H4.PP >= 0.8)])
   plot.data %<>% dplyr::filter(Gene %in% colocalizing.genes)
-  plot.df = data.frame(State=character(),PP=numeric(),Gene=character(),Position=numeric())
+  plot.df = data.frame(State=character(),PP=numeric(),Gene=character(),
+                       Chromosome=numeric(),Position=numeric())
   
   plot.df %<>% add_row(State='Resting',PP=plot.data$H4.PP,Gene=plot.data$Gene,
-                       Position=plot.data$POS)
+                       Chromosome=plot.data$CHR,Position=plot.data$POS)
   
   if (outcome == 'A2') text.outcome = 'Severe'
   else if (outcome == 'B2') text.outcome = 'Hospitalized'
@@ -500,42 +441,207 @@ plotDynamicPP.GTEx = function(data,outcome,type.of.qtl,chromosomes,exclude.genes
   plot.df$Gene = replaceGeneNames(plot.df$Gene)
   
   plot.df %<>% dplyr::filter(!(Gene %in% exclude.genes))
-  
-  if (outcome=='A2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant E' & Position==33969937))
-  if (outcome=='A2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant F' & Position==33969937))
-  if (outcome=='B2') plot.df %<>% dplyr::filter(!(Gene=='IFNAR2 Splice Variant F' & Position==33940612))
-  
-  if (type.of.qtl == 'eQTL') { #not done for sQTLs because there are too many - makes a hard to interpret plot
-    colocalizing.genes = c('ABO','HIP1','NAPSA','NTN5','ENSG00000236263',
-                           'ICAM5','OAS3','RAVER1','TYK2')
-    plot.df %<>% dplyr::filter(Gene %in% colocalizing.genes)
-    hues = hue_pal()(length(colocalizing.genes))
-    group.colors = c(ABO=hues[1],HIP1=hues[2],NAPSA=hues[3],
-                     NTN5=hues[4],ENSG00000236263=hues[5],ICAM5=hues[6],
-                     OAS3=hues[7],RAVER1=hues[8],TYK2=hues[9])
-    group.shapes = c(ABO=16,HIP1=17,NAPSA=15,NTN5=3,ENSG00000236263=7,
-                     ICAM5=8,OAS3=1,RAVER1=2,TYK2=5)
-  }
-  
-  plot = ggplot(plot.df,aes(x=State,y=PP,group=Gene)) + theme_bw() +
-          geom_point(aes(shape=Gene),size=3) +
-          theme(text=element_text(size=24)) + geom_hline(yintercept=0.8,linetype='dotted') +
-          # ggtitle(glue('Outcome: {text.outcome}')) +
-          ylim(c(0,1))
-  if (type.of.qtl == 'eQTL') plot = plot + scale_color_manual(values=group.colors) +
-    scale_shape_manual(values=group.shapes)
-  print(plot)
+
+  plotColocAll('gtex',plot.df)
   return(plot.df)
 }
-#########################################
-#proteomics functions
-getSomaData = function(analyte) { 
+plotColocAll = function(dataset,data) {
+  if (dataset == 'soskic') {
+    plt = ggplot(data,aes(x=Time,y=Gene,fill=PP)) + scale_y_discrete(limits=rev)
+  }else if (dataset == 'bqc') {
+    data$State = str_replace(data$State,'inf','Inf')
+    data$State = str_replace(data$State,'nonInf','Noninf')
+    plt = ggplot(data,aes(x=State,y=Gene,fill=PP)) +
+      scale_y_discrete(limits=rev) + scale_x_discrete(limits=c('Noninf','Inf'))
+  }else if (dataset == 'gtex') {
+    plt = ggplot(data,aes(x=State,y=Gene,fill=PP)) +
+      scale_y_discrete(limits=rev)
+  }
+  plt = plt + geom_tile(aes(linetype=(PP>=0.8)),show.legend=F) + theme_bw() + 
+    theme(text=element_text(size=28)) +
+    ylab('') + scale_fill_continuous(limits=c(0,1)) +
+    geom_text(aes(label=round(PP,2)),color='white',size=10)
+  print(plt)
+}
+getAllMRDataReady = function(dataset,type.of.qtl,data) {
+  new.data = data %>% dplyr::arrange(Outcome,CHR,POS)
+  strong.coloc = new.data %>% dplyr::filter(H4.PP >= 0.8,CHR != 6)
+
+  out.data.list = list()
+  out.data.labels = list()
+  
+  if (dataset == 'soskic') {
+    for (item in 1:nrow(strong.coloc)) {
+      print(glue('On item {item} of {nrow(strong.coloc)}'))
+      curr.row = strong.coloc[item,]
+      cell = gsub('.*/','',curr.row$Cell) ; cell = gsub('_500.*','',cell)
+      cell.split = str_split(cell,'_')[[1]]
+      if (length(cell.split) > 2) curr.cell = glue('{cell.split[[1]]}_{cell.split[[2]]}')
+      else curr.cell = cell.split[[1]]
+      time = cell.split[[length(cell.split)]] ; 
+      if (curr.cell == 'TEM') curr.cell = glue('{curr.cell}_{time}')
+      else if (curr.cell == 'TN') curr.cell = glue('{curr.cell}_{time}')
+      else if (curr.cell == 'TCM') curr.cell = 'TCM_'
+      time = glue('_{time}_')
+      plt.data = soskicColoc(vector.specific=c(curr.row$Outcome,curr.row$CHR,curr.row$POS,curr.cell,time,curr.row$Gene),allCells=F,returnCommonQTLs = T,mr=T)
+      out.data.labels[[item]] = glue('{curr.row$Outcome}_{curr.cell}_{time}_{curr.row$CHR}_{curr.row$POS}_{curr.row$Gene}')
+      out.data.list[[item]] = plt.data
+    }
+  }else if (dataset == 'bqc') {
+    for (item in 1:nrow(strong.coloc)) { #outcome,chr,pos,gene
+      print(glue('On item {item} of {nrow(strong.coloc)}'))
+      curr.row = strong.coloc[item,]
+      out.data.labels[[item]] = glue('{curr.row$Outcome}_{curr.row$InfState}_{curr.row$CHR}_{curr.row$POS}_{curr.row$Gene}')
+      out.data.list[[item]] = bqcColoc(type.of.qtl,vector.specific=c(curr.row$Outcome,curr.row$CHR,curr.row$POS,curr.row$InfState,curr.row$Gene),returnCommonQTLs = T,mr=T)
+    }
+  }else if (dataset == 'gtex') {
+    for (item in 1:nrow(strong.coloc)) {
+      print(glue('On item {item} of {nrow(strong.coloc)}'))
+      curr.row = strong.coloc[item,]
+      out.data.labels[[item]] = glue('{curr.row$Outcome}_{curr.row$CHR}_{curr.row$POS}_{curr.row$Gene}')
+      out.data.list[[item]] = gtexColoc(type.of.qtl,vector.specific=c(curr.row$Outcome,curr.row$CHR,curr.row$POS,NA,curr.row$Gene),returnCommonQTLs = T,mr=T)
+    }
+  }
+  return(list(out.data.list,out.data.labels))
+}
+conductMR = function(data) {
+  to.return = data.frame(Label=character(),nSnps=numeric(),Beta=numeric(),SE=numeric(),
+                         Pval=numeric(),WMedianBeta=numeric(),WModeBeta=numeric(),
+                         EggerBeta=numeric(),EggerInterceptP=numeric(),SteigerP=numeric())
+  
+  for (item in 1:length(data[[1]])) {
+    print(glue('Doing MR {item} of {length(data[[1]])}'))
+    common.qtls = data[[1]][[item]] ; rsids = common.qtls[[2]][['rsid']]
+    
+    #prep exposure data. 
+    exp.rsid.df = data.frame(VID=common.qtls[[1]][['variant_id']],Rsid=NA)
+    for (item2 in 1:nrow(exp.rsid.df)) {
+      if (exp.rsid.df$VID[[item2]] %in% common.qtls[[2]][['variant_id']])
+        exp.rsid.df$Rsid[[item2]] = rsids[which(common.qtls[[2]][['variant_id']]==exp.rsid.df$VID[[item2]])]
+    }
+    exposure.data = data.frame(chr=common.qtls[[1]][['chr']],position=common.qtls[[1]][['position']],
+                               beta=common.qtls[[1]][['beta']],se=common.qtls[[1]][['se']],
+                               SNP=exp.rsid.df$Rsid,effect_allele=common.qtls[[1]][['ALT']],
+                               other_allele=common.qtls[[1]][['REF']],eaf=common.qtls[[1]][['MAF']],
+                               samplesize=common.qtls[[1]][['N']],pval=common.qtls[[1]][['pvalues']])
+    exposure.data = format_data(exposure.data,type='exposure')
+    exposure.data = clump_data(exposure.data,pop='EUR')
+    if (length(which(is.na(exposure.data$SNP))>0)) print('Missing an rsid for exposure data, need proxy')
+    
+    #prep outcome data
+    outcome.data = data.frame(chr=common.qtls[[2]][['CHR']],position=common.qtls[[2]][['position']],
+                              beta=common.qtls[[2]][['beta']],se=common.qtls[[2]][['se']],
+                              SNP=rsids,effect_allele=common.qtls[[2]][['ALT']],
+                              other_allele=common.qtls[[2]][['REF']],eaf=common.qtls[[2]][['MAF']],
+                              samplesize=common.qtls[[2]][['N']],pval=common.qtls[[2]][['pvalues']])
+    outcome.data = format_data(outcome.data,type='outcome')
+    
+    #harmonize and Steiger
+    harmonized = harmonise_data(exposure.data,outcome.data)
+    steiger = directionality_test(harmonized)
+    cat("Directionality | p-value",steiger$steiger_pval, collapse="\n")
+    
+    #do mr functions
+    if (sum(harmonized$mr_keep)==0) print('No SNP remaining after harmonization')
+    else if (sum(harmonized$mr_keep)==1) {
+      result = mr(harmonized, method_list = "mr_wald_ratio")
+      to.return %<>% add_row(Label=data[[2]][[item]],nSnps=result$nsnp,Beta=result$b,
+                             SE=result$se,Pval=result$pval,WMedianBeta=NA,WModeBeta=NA,
+                             EggerBeta=NA,EggerInterceptP=NA,SteigerP=steiger$steiger_pval)
+      cat("eBMD | Wald-Ratio | MR nsnp",result$nsnp,"| b:",result$b,"| se",result$se,"| p-value",result$pval, collapse="\n")
+    }else if (sum(harmonized$mr_keep)>1) {
+      result <- mr(harmonized, method_list = c("mr_ivw","mr_two_sample_ml","mr_weighted_median","mr_penalised_weighted_median","mr_weighted_mode"))
+      cat("IVW | MR nsnp",result$nsnp[1],"| b:",result$b[1],"| se",result$se[1],"| p-value",result$pval[1], collapse="\n")
+      if (sum(harmonized$mr_keep)>2) {
+        cat("WMedian | MR nsnp",result$nsnp[3],"| b:",result$b[3],"| se",result$se[3],"| p-value",result$pval[3], collapse="\n")
+        cat("Wmode | MR nsnp",result$nsnp[5],"| b:",result$b[5],"| se",result$se[5],"| p-value",result$pval[5], collapse="\n")
+        egger_result <- mr_egger_regression(harmonized$beta.exposure[harmonized$mr_keep],
+                                            harmonized$beta.outcome[harmonized$mr_keep],
+                                            harmonized$se.exposure[harmonized$mr_keep],
+                                            harmonized$se.outcome[harmonized$mr_keep])
+        cat("Egger | MR nsnp",egger_result$nsnp,"| b:",egger_result$b,"| se",egger_result$se,"| p-value",egger_result$pval, collapse="\n")
+        cat("Egger-intercept | MR nsnp",egger_result$nsnp,"| b:",egger_result$b_i,"| se",egger_result$se_i,"| p-value",egger_result$pval_i, collapse="\n")
+        
+        to.return %<>% add_row(Label=data[[2]][[item]],nSnps=result$nsnp[1],Beta=result$b[1],
+                               SE=result$se[1],Pval=result$pval[1],WMedianBeta=result$b[3],
+                               WModeBeta=result$b[5],EggerBeta=egger_result$b,
+                               EggerInterceptP=egger_result$pval_i,SteigerP=steiger$steiger_pval)
+      } else {
+        to.return %<>% add_row(Label=data[[2]][[item]],nSnps=result$nsnp[1],Beta=result$b[1],
+                               SE=result$se[1],Pval=result$pval[1],WMedianBeta=NA,WModeBeta=NA,
+                               EggerBeta=NA,EggerInterceptP=NA,SteigerP=steiger$steiger_pval)
+      }
+    }
+  }
+  return(to.return)  
+}
+plotMRResults = function(data.source,type.of.qtl,data,outcome,num.tests,cut.genes) { 
+  df = data %>% dplyr::filter(str_detect(data$Label,paste0(outcome,'_'))) %>%
+    mutate(State=NA,Gene=NA)
+  if (data.source == 'bqc') { df$State[which(str_detect(df$Label,'_inf_'))] = 'Inf' ; df$State[which(str_detect(df$Label,'_noninf_'))] = 'Noninf' }
+  if (type.of.qtl == 'eQTL') df$Gene = gsub('.*ENSG','ENSG',df$Label) 
+  else df$Gene = gsub('.*chr','chr',df$Label)
+  df %<>% dplyr::filter(Gene %notin% cut.genes) 
+  df$Gene = replaceGeneNames(df$Gene) ; df$Gene = gsub('\\..*','',df$Gene)
+  
+  if (data.source == 'soskic') {
+    for (row in 1:nrow(df)) {
+      split.label = str_split(df$Label[[row]],'__')[[1]]
+      df$Time[[row]] = split.label[[2]]
+      cell = str_split(split.label[[1]],'_')[[1]]
+      if (cell[[2]] == 'CD4') df$Cell[[row]] = glue('CD4_{cell[[3]]}')
+      else df$Cell[[row]] = cell[[2]]
+    }
+    df %<>% mutate(CellTimeGene=glue('{df$Cell}_{df$Time}_{df$Gene}'))
+  }
+  if (data.source=='bqc') df %<>% mutate(GeneState=glue('{df$Gene}_{df$State}'))
+  
+  df$PassTesting = NA
+  for (row in 1:nrow(df)) {
+    if (!is.na(df$WMedianBeta[[row]])) 
+      df$PassTesting[[row]] = (df$Pval[[row]] <= 0.05/num.tests & sign(df$Beta[[row]])==sign(df$WMedianBeta[[row]]) &
+                                 sign(df$Beta[[row]])==sign(df$WModeBeta[[row]]) & 
+                                 sign(df$Beta[[row]])==sign(df$EggerBeta[[row]]) &
+                                 df$EggerInterceptP[[row]]>0.05 & df$SteigerP[[row]]<0.05/num.tests)
+    else
+      df$PassTesting[[row]] = (df$Pval[[row]] <= 0.05/num.tests & df$SteigerP[[row]]<0.05/num.tests)
+  }
+  
+  if (data.source == 'bqc') plt = ggplot(df,aes(y=GeneState,x=exp(Beta),xmin=exp(Beta-1.96*SE),xmax=exp(Beta+1.96*SE),color=PassTesting)) 
+  else if (data.source == 'gtex') plt = ggplot(df,aes(y=Gene,x=exp(Beta),xmin=exp(Beta-1.96*SE),xmax=exp(Beta+1.96*SE),color=PassTesting))
+  else if (data.source == 'soskic') plt = ggplot(df,aes(y=CellTimeGene,x=exp(Beta),xmin=exp(Beta-1.96*SE),xmax=exp(Beta+1.96*SE),color=PassTesting)) 
+  
+  plt = plt + geom_point(aes(shape=PassTesting),size=4) + geom_errorbar(width=0.2) + xlab('Odds ratio') +
+          scale_y_discrete(limits=rev) + theme_bw() + theme(text=element_text(size=28),legend.position="none") +
+          geom_vline(xintercept=1,linetype='dotted') + ylab('')
+  if (outcome == 'A2' & data.source == 'soskic')
+    plot = plot + 
+    scale_y_discrete(limits=rev(c('CD4 Naive CAT 0h','TN CAT 0h','CD4 Memory CAT 5d',
+                                  'TCM CAT 5d','CD4 Naive NAPSA 40h','TN NAPSA 40h',
+                                  'TEM NAPSA 40h','CD4 Memory ACSF3 5d','TEM RALGDS 16h')))
+  else if (outcome == 'B2' & data.source == 'soskic')
+    plot = plot + 
+    scale_y_discrete(limits=rev(c('CD4 Naive CAT 0h','TN CAT 0h','CD4 Memory CAT 5d',
+                                  'TCM CAT 5d','CD4 Naive NAPSA 40h','TN NAPSA 40h',
+                                  'TEM NAPSA 40h','CD4 Naive RAB2A 16h','TN RAB2A 16h',
+                                  'CD4 Memory RAB2A 16h','TCM RAB2A 16h','CD4 Naive RAB2A 40h',
+                                  'TN RAB2A 40h','CD4 Memory RAB2A 40h','TEM RALGDS 16h')))
+  else if (outcome == 'C2' & data.source == 'soskic')
+    plot = plot + 
+    scale_y_discrete(limits=rev(c('CD4 Naive CAT 0h','TN CAT 0h','CD4 Memory CAT 5d',
+                                  'TCM CAT 5d','CD4 Naive NAPSA 40h','TN NAPSA 40h',
+                                  'TEM NAPSA 40h','TCM ADAM15 5d','TEM RALGDS 16h')))
+  print(plt)
+  
+  return(df %>% mutate(OR=exp(Beta),Lower_OR=exp(Beta-1.96*SE),Upper_OR=exp(Beta+1.96*SE)))
+}
+getSomaData = function(analyte) {
   #get somascan column name of interest, use medNormRef file
   seq.id = getSEQID(analyte)
   
-  soma.batch1 = read.adat('~/SS-200150_v4_ACDPlasma.hybNorm.medNormInt.plateScale.calibrate.anmlQC.qcCheck.medNormRefSMP.adat') %>% 
+  soma.batch1 = read.adat('/project/richards/sirui.zhou/new/proteomic_raw/SS-200150_v4_ACDPlasma.hybNorm.medNormInt.plateScale.calibrate.anmlQC.qcCheck.medNormRefSMP.adat') %>% 
     dplyr::select(SubjectID,seq.id,PlateId)
-  soma.batch2 = read.adat('~/SS-215174.hybNorm.medNormInt.plateScale.medNormRefSMP.adat') %>%
+  soma.batch2 = read.adat('/project/richards/sirui.zhou/new/proteomic_raw/SS-215174.hybNorm.medNormInt.plateScale.medNormRefSMP.adat') %>%
     dplyr::select(SubjectID,seq.id,PlateId)
   all.soma = soma.batch1 %>% add_row(soma.batch2) %>% drop_na(SubjectID) %>%
     distinct(SubjectID,.keep_all=T)
@@ -545,27 +651,27 @@ getSomaData = function(analyte) {
   for (row in misnamed.rows) { all.soma[['SubjectID']][[row]] = glue('VAP{str_replace(all.soma[["SubjectID"]][[row]],"_CHUM","")}') }
   
   #and get the bqcid
-  vcode.bqcid.dict = readxl::read_xlsx('~/Vcode_mapping_Release6.xlsx',sheet='All') %>%
+  vcode.bqcid.dict = readxl::read_xlsx('/project/richards/restricted/bqc19_release7/BQC19_Release_Clinical_Phenotypic/Vcode_mapping_Release6.xlsx',sheet='All') %>%
     dplyr::select(bqc_id,plasma_vcode...21) %>% dplyr::rename(SubjectID = plasma_vcode...21,BQCID=bqc_id)
   all.soma = inner_join(all.soma,vcode.bqcid.dict,by='SubjectID') 
   names(all.soma)[[2]] = 'Analyte'
   
   return(all.soma)
 }
-getRelevantRedcap = function() { #get patient information
-  sample.genotype.dictionary = vroom(file='~/pt_age_sex.tsv') %>%
+getRelevantRedcap = function() {
+  sample.genotype.dictionary = vroom(file='/scratch/richards/julian.willett/eQTLpQTLDisconnect/pt_age_sex.tsv') %>%
     dplyr::select(Alias.BQCid,genotypeID) %>% dplyr::rename(BQCID=Alias.BQCid)
-  redcap.data = vroom(file='~/redcap_clinical_data_raw_2022-05-12.csv') %>%
+  redcap.data = vroom(file='/project/richards/restricted/bqc19_release7/BQC19_Release_Clinical_Phenotypic/redcap_clinical_data_raw_2022-05-12.csv') %>%
     dplyr::select(BQCID,copy_female,copy_age) %>% distinct(BQCID,.keep_all=T)
   common.data = inner_join(redcap.data,sample.genotype.dictionary,by='BQCID')
-  outcome.data = readRDS('~/BQC19_A2B2C2.rds') %>%
+  outcome.data = readRDS('/scratch/richards/julian.willett/eQTLpQTLDisconnect/BQC19_A2B2C2.rds') %>%
     dplyr::rename(BQCID = BQC.identifier..public.) %>% dplyr::select(BQCID,A2,B2,C2)
   common.data = inner_join(common.data,outcome.data,by='BQCID')
-  pc.data = vroom('~/EUR.pc') %>%
+  pc.data = vroom('/project/richards/tomoko.nakanishi/09.COVID19/data/05.BQC/01.genotype/v5.0/08.PC/EUR.pc') %>%
     dplyr::rename(genotypeID = FID) %>% dplyr::select(-IID)
   common.data = inner_join(common.data,pc.data,by='genotypeID') %>%
     dplyr::rename(Female=copy_female,Age=copy_age)
-  testing.site = vroom('~/center_mapping_BQCID_20220126.csv')
+  testing.site = vroom('/scratch/richards/julian.willett/eQTLpQTLDisconnect/center_mapping_BQCID_20220126.csv')
   for (item in 1:nrow(testing.site)) {
     if (str_detect(testing.site$individual_id[[item]],'JGH')) testing.site$individual_id[[item]] = 'JGH'
     else if (str_detect(testing.site$individual_id[[item]],'CRCHUM')) testing.site$individual_id[[item]] = 'CRCHUM'
