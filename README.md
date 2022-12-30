@@ -11,8 +11,6 @@ Code involves identifying putatively causal variants with MR and then using colo
 5. Plot MR results for variants that passed MR and colocalization sensitivity testing
 6. Collect data for all states for putatively causal variants (for making a heatmap plot)
 7. Make the heatmap plot demonstrating the role of cell, cell stimulation, time after stimulation, and disease state on colocalization.
-8. Get necessary data for the proteomics analysis
-9. Run logistic regression for proteomics analysis.
 
 Package versions:
 TwoSampleMR: v0.5.6
