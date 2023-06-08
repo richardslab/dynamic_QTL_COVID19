@@ -8,16 +8,17 @@ source('Functions_Revised_for_Time.R') ; source('dynamic_QTL_coloc_minorfunction
 cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 # remember to give 60 GB Ram for clumping, 30 Gb for MR
-args = commandArgs(trailingOnly=TRUE)
-curr.index = as.numeric(args[[1]])
-stop()
+# these few lines are for running the data collection, which is time intensive, more efficiently
+# args = commandArgs(trailingOnly=TRUE)
+# curr.index = as.numeric(args[[1]])
+# stop()
 
 #first, need to make smaller files that we can do MR/coloc on to speed things up
 # produceGTExSubpositionData() #grch38, done, slow
 # produceSingleCellWholeBloodSubpositionData() # slow
 # produceHGISubpositionData() #grch38, done, fast
 
-order.index=c(1,87) #to facilitate running time-intensive steps in parallel
+order.index=c(1,87) #to facilitate running time-intensive steps in parallel. Can select a single index via the bash script in a scheduler program.
 # getPreHarmonizedData('GTEx',order.index) #done
 # getPreHarmonizedData('BQC19',c(curr.index,curr.index))
 # getPreHarmonizedData('SC_Brain',order.index) #done
